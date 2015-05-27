@@ -17,3 +17,4 @@ addSbtPlugin("org.scoverage" %% "sbt-coveralls" % "1.0.0.BETA1")
 
 scalacOptions in Compile ++= Seq("-feature", "-deprecation")
 
+addSbtPlugin("com.typesafe.sbteclipse" % "sbteclipse-plugin" % "2.5.0")

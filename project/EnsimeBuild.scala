@@ -208,8 +208,62 @@ object EnsimeBuild extends Build with JdkResolver {
     ) ++ testLibs(scalaVersion.value, "it,test")
   )
 
+lazy val client = Project("client", file("client")).dependsOn(
+    api, swank,
+    sexpress % "test->test",
+    swank % "test->test",
+    // depend on "it" dependencies in "test" or sbt adds them to the release deps!
+    // https://github.com/sbt/sbt/issues/1888
+    testingEmpty % "test,it",
+    testingSimple % "test,it",
+    testingDebug % "test,it",
+    testingDocs % "test,it"
+  ).configs(It).settings (
+    commonSettings
+  ).settings (
+    inConfig(It)(Defaults.testSettings)
+  ).settings (
+    scalariformSettingsWithIt
+  ).settings (
+    // careful: parallel forks are causing weird failures
+    // https://github.com/sbt/sbt/issues/1890
+    parallelExecution in It := false,
+    // https://github.com/sbt/sbt/issues/1891
+    // this is supposed to set the number of forked JVMs, but it doesn't
+    // concurrentRestrictions in Global := Seq(
+    //   Tags.limit(Tags.ForkedTestGroup, 4)
+    // ),
+    fork in It := true,
+    testForkedParallel in It := true,
+    javaOptions in It += "-Dfile.encoding=UTF8", // for file cloning
+    testOptions in It ++= noColorIfEmacs,
+    internalDependencyClasspath in Compile += { Attributed.blank(JavaTools) },
+    internalDependencyClasspath in Test += { Attributed.blank(JavaTools) },
+    internalDependencyClasspath in It += { Attributed.blank(JavaTools) },
+    javaOptions in It ++= Seq(
+      "-Dlogback.configurationFile=../logback-it.xml"
+    ),
+    libraryDependencies ++= Seq(
+      "com.h2database" % "h2" % "1.4.187",
+      "com.typesafe.slick" %% "slick" % "2.1.0",
+      "com.jolbox" % "bonecp" % "0.8.0.RELEASE",
+      "org.apache.commons" % "commons-vfs2" % "2.0" intransitive(),
+      // lucene 4.8+ needs Java 7: http://www.gossamer-threads.com/lists/lucene/general/225300
+      "org.apache.lucene" % "lucene-core" % "4.7.2",
+      "org.apache.lucene" % "lucene-analyzers-common" % "4.7.2",
+      "org.ow2.asm" % "asm-commons" % "5.0.3",
+      "org.ow2.asm" % "asm-util" % "5.0.3",
+      "org.scala-lang" % "scala-compiler" % scalaVersion.value,
+      "org.scala-lang" % "scalap" % scalaVersion.value,
+      "com.typesafe.akka" %% "akka-actor" % "2.3.9",
+      "org.scala-refactoring" %% "org.scala-refactoring.library" % "0.6.2",
+      "commons-lang" % "commons-lang" % "2.6",
+      "io.spray" %% "spray-can" % "1.3.3"
+    ) ++ testLibs(scalaVersion.value, "it,test")
+  )
+
   lazy val root = Project(id = "ensime", base = file("."), settings = commonSettings) aggregate (
-    api, sexpress, swank, server
+    api, sexpress, swank, server, client
   ) dependsOn (server)
 }
 
