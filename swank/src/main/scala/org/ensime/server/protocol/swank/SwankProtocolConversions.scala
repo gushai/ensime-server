@@ -476,7 +476,15 @@ object SwankProtocolResponse {
         o.start.toSexp,
         o.end.toSexp
       )
-    def read(sexp: Sexp): SymbolDesignation = ???
+    def read(sexp: Sexp): SymbolDesignation = {
+      sexp match {
+        case SexpCons(SexpSymbol(tpe), SexpCons(SexpNumber(from), SexpCons(SexpNumber(to), SexpNil))) => {
+          val srcSmybol = symbolToSourceSymbol(tpe)
+          SymbolDesignation(to.toInt, from.toInt, srcSmybol.getOrElse(ObjectSymbol))
+        }
+        case _ => throw new Exception("Issue with SourceSymbol")
+      }
+    }
   }
   implicit val SymbolDesignationsFormat = SexpFormat[SymbolDesignations]
 
