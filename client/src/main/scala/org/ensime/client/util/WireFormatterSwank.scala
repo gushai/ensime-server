@@ -32,6 +32,16 @@ class WireFormatterSwank extends WireFormatter {
       case InspectPackageByPathReq(path) => {
         s"""(swank:inspect-package-by-path "$path")"""
       }
+      case InspectTypeAtPointReq(file, range) => {
+        val fileStr = file.getAbsolutePath
+        val from = range.from
+        val to = range.to
+        if (from != to) {
+          s"""(swank:inspect-type-at-point "$fileStr" ($from $to))"""
+        } else {
+          s"""(swank:inspect-type-at-point "$fileStr" $from)"""
+        }
+      }
       case InitProjectReq => {
         s"""(swank:init-project)"""
       }
@@ -62,6 +72,9 @@ class WireFormatterSwank extends WireFormatter {
       case SymbolDesignationsReq(filename, start, end, requestedTypes) => {
         val types = requestedTypes.map { (s: SourceSymbol) => mapSourceSymbolMap(s) }.mkString(" ")
         s"""(swank:symbol-designations "$filename" $start $end (""" + types + """))"""
+      }
+      case UsesOfSymbolAtPointReq(file, point) => {
+        s"""(swank:uses-of-symbol-at-point "$file" $point)"""
       }
       case _ => throw (new Exception("Unknown Request Type supplied"))
     }

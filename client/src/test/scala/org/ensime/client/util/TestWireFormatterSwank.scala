@@ -46,7 +46,7 @@ class TestWireFormatterSwank extends FunSpec {
       assert(wfString.equals(cmpString))
     }
 
-    it("should generate a correct TypeAtPointReq with range input from neq to") {
+    it("should generate a correct TypeAtPointReq with range input") {
       val id = currentId.getAndIncrement
       val file = new File("/path/to/file.scala")
       val rangeFrom = 149
@@ -62,7 +62,7 @@ class TestWireFormatterSwank extends FunSpec {
 
     }
 
-    it("should generate a correct TypeAtPointReq with range input from eq to") {
+    it("should generate a correct TypeAtPointReq with point input") {
       val id = currentId.getAndIncrement
       val file = new File("/path/to/file.scala")
       val rangeFrom = 150
@@ -78,6 +78,44 @@ class TestWireFormatterSwank extends FunSpec {
 
     }
 
+    it("should generate a correct InpectTypeAtPointReq with range input") {
+      val id = currentId.getAndIncrement
+      val file = new File("/path/to/file.scala")
+      val rangeFrom = 150
+      val rangeTo = 151
+      val range = new OffsetRange(rangeFrom, rangeTo)
+
+      val request = InspectTypeAtPointReq(file, range)
+      val wfString = wireFormatterSwank.toWireFormat(request, id);
+
+      val cmpString = s"""(:swank-rpc (swank:inspect-type-at-point "$file" ($rangeFrom $rangeTo)) $id)"""
+
+      assert(wfString.equals(cmpString))
+    }
+    it("should generate a correct InpectTypeAtPointReq with point input") {
+      val id = currentId.getAndIncrement
+      val file = new File("/path/to/file.scala")
+      val rangeFrom = 150
+      val range = new OffsetRange(rangeFrom, rangeFrom)
+
+      val request = InspectTypeAtPointReq(file, range)
+      val wfString = wireFormatterSwank.toWireFormat(request, id);
+
+      val cmpString = s"""(:swank-rpc (swank:inspect-type-at-point "$file" $rangeFrom) $id)"""
+
+      assert(wfString.equals(cmpString))
+    }
+
+    it("should generate a correct InspectPackageByPathReq") {
+      val id = currentId.getAndIncrement
+      val path = "org.ensime.client"
+      val request = InspectPackageByPathReq(path)
+      val wfString = wireFormatterSwank.toWireFormat(request, id)
+
+      val cmpString = s"""(:swank-rpc (swank:inspect-package-by-path "$path") $id)"""
+      assert(wfString.equals(cmpString))
+    }
+
     ignore("should generate a correct TypecheckFileReq") {
       val id = currentId.getAndIncrement
 
@@ -88,6 +126,16 @@ class TestWireFormatterSwank extends FunSpec {
       val cmpString = s"""(:swank-rpc (swank:typecheck-file ("$fStr")) $id)"""
       assert(wfString.equals(cmpString))
 
+    }
+
+    it("should generate a correct UsesOfSymbolAtPointReq") {
+      val id = currentId.getAndIncrement
+      val file = new File("/path/to/file.scala")
+      val point = 31
+      val request = UsesOfSymbolAtPointReq(file, point)
+      val wfString = wireFormatterSwank.toWireFormat(request, id)
+      val cmpString = s"""(:swank-rpc (swank:uses-of-symbol-at-point "$file" $point) $id)"""
+      assert(wfString.equals(cmpString))
     }
 
   }

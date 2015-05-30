@@ -70,4 +70,20 @@ class WireResponseExtractorSwank extends WireResponseExtractor {
     Some(t)
   }
 
+  def getInspectTypeAtPoint(msg: String): Option[TypeInspectInfo] = {
+    ???
+    println(msg)
+    println(dropResponseEnvelope(msg))
+    println(SexpParser.parse(dropResponseEnvelope(msg)))
+    val t = SexpParser.parse(dropResponseEnvelope(msg)).convertTo[TypeInspectInfo]
+    Some(t)
+  }
+
+  def getInspectPackageByPath(msg: String): Option[PackageInfo] = {
+    val t = SexpParser.parse(dropResponseEnvelope(msg)).convertTo[PackageInfo]
+    Some(t)
+  }
+
+  def getUsesOfSymbolsAtPoint(msg: String): Future[List[ERangePosition]] = { ??? }
+
 }

@@ -158,7 +158,28 @@ class Client(host: String, port: Int) extends EnsimeAsyncApi {
   def completionsAtPoint(fileInfo: SourceFileInfo, point: Int, maxResults: Int, caseSens: Boolean, reload: Boolean): Future[CompletionInfoList] = { ??? }
   def packageMemberCompletion(path: String, prefix: String): Future[List[CompletionInfo]] = { ??? }
 
-  def inspectTypeAtPoint(fileName: File, range: OffsetRange): Future[Option[TypeInspectInfo]] = { ??? }
+  def inspectTypeAtPoint(fileName: File, range: OffsetRange): Future[Option[TypeInspectInfo]] = {
+
+    val pResponseMessage = sendRequest(InspectTypeAtPointReq(fileName, range))
+
+    /// TODO: Add timeout exception! and failure...!!!
+    val pResponseObject = Promise[Option[TypeInspectInfo]]
+
+    pResponseMessage.future.onComplete {
+      case msg if msg.isSuccess && responseExtractor.isSuccessfullResponse(msg.get) => {
+        println(msg.get)
+        //pResponseObject.success(responseExtractor.getInspectTypeAtPoint(msg.get))
+
+      }
+      case _ => {
+        /// TODO: Include message information? 
+        throw new Exception("Unsuccessful response. ")
+      }
+
+    }
+    pResponseObject.future
+
+  }
 
   def inspectTypeById(typeId: Int): Future[Option[TypeInspectInfo]] = { ??? }
 
@@ -199,7 +220,27 @@ class Client(host: String, port: Int) extends EnsimeAsyncApi {
     pResponseObject.future
 
   }
-  def inspectPackageByPath(path: String): Future[Option[PackageInfo]] = { ??? }
+  def inspectPackageByPath(path: String): Future[Option[PackageInfo]] = {
+
+    val pResponseMessage = sendRequest(InspectPackageByPathReq(path))
+
+    /// TODO: Add timeout exception! and failure...!!!
+    val pResponseObject = Promise[Option[PackageInfo]]
+
+    pResponseMessage.future.onComplete {
+      case msg if msg.isSuccess && responseExtractor.isSuccessfullResponse(msg.get) => {
+        log(msg.get)
+        pResponseObject.success(responseExtractor.getInspectPackageByPath(msg.get))
+      }
+      case _ => {
+        /// TODO: Include message information? 
+        throw new Exception("Unsuccessful response. ")
+      }
+
+    }
+    pResponseObject.future
+
+  }
 
   def prepareRefactor(procId: Int, refactorDesc: RefactorDesc): Future[Either[RefactorFailure, RefactorEffect]] = { ??? }
   def execRefactor(procId: Int, refactorType: RefactorType): Future[Either[RefactorFailure, RefactorResult]] = { ??? }

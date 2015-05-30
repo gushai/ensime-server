@@ -10,7 +10,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class TestClient extends FunSpec with BeforeAndAfterAll {
 
   val host = "127.0.0.1"
-  val port = 40420
+  val port = 43947
 
   val logString = "[TestClient]\t"
 
@@ -24,7 +24,7 @@ class TestClient extends FunSpec with BeforeAndAfterAll {
 
   override def afterAll() {
     println(logString + "Waiting for results...")
-    Thread.sleep(1000)
+    Thread.sleep(20000)
     println(logString + "Done")
     println(logString + "Closing ENSIME-Client...")
     client.close()
@@ -78,7 +78,7 @@ class TestClient extends FunSpec with BeforeAndAfterAll {
 
     }
 
-    it("should send a TypeAtPointReq") {
+    it("should send a TypeAtPointReq with range input from eq to") {
       val path = "/home/gus/scala/sbtlearn/rational/src/main/scala/de/uni/tuebingen/rational/rational.scala"
       val file = new File(path)
       val rangeFrom = 247
@@ -87,12 +87,34 @@ class TestClient extends FunSpec with BeforeAndAfterAll {
       client.typeAtPoint(file, new OffsetRange(rangeFrom, rangeTo))
     }
 
+    it("should send a TypeAtPointReq with range input from neq to") {
+      val path = "/home/gus/scala/sbtlearn/rational/src/main/scala/de/uni/tuebingen/rational/rational.scala"
+      val file = new File(path)
+      val rangeFrom = 150
+      val rangeTo = 151
+
+      val typeAtPoint = client.typeAtPoint(file, new OffsetRange(rangeFrom, rangeTo))
+    }
+
+    ignore("should send a InspectTypeAtPoint") {
+      val path = "/home/gus/scala/sbtlearn/rational/src/main/scala/de/uni/tuebingen/rational/rational.scala"
+      val file = new File(path)
+      val rangeFrom = 150
+      val rangeTo = 151
+      val inspectTypeAtPoint = client.inspectTypeAtPoint(file, new OffsetRange(rangeFrom, rangeTo))
+    }
+
+    ignore("should send a InspectPackageByPath") {
+      val path = "rational"
+      val inspectPackageByPath = client.inspectPackageByPath(path)
+    }
+
     ignore("should send a TypecheckFileReq") {
       val f = new File("/home/gus/scala/sbtlearn/rational/src/main/scala/de/uni/tuebingen/rational/rational.scala")
       client.typecheckFile(SourceFileInfo(f, None, None))
     }
 
-    it("should send a TypecheckAllReq") {
+    ignore("should send a TypecheckAllReq") {
       client.typecheckAll()
     }
 
