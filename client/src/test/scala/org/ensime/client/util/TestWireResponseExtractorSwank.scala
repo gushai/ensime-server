@@ -53,6 +53,23 @@ class TestWireResponseExtractorSwank extends FunSpec {
 
     }
 
+    it("should extract a BasicTypeInfo object (ArrowTypeInfo)") {
+      // original message from server: """(:return (:ok (:arrow-type t :name "(that: Long)rational.Rational" :type-id 28 :result-type (:arrow-type nil :name "Rational" :type-id 8 :decl-as class :full-name "rational.Rational" :type-args nil :members nil :pos nil :outer-type-id nil) :param-sections ((:params (("that" (:arrow-type nil :name "Long" :type-id 13 :decl-as class :full-name "scala.Long" :type-args nil :members nil :pos nil :outer-type-id nil))) :is-implicit nil)))) 129)"""
+      val responseMessage = s"""(:return (:ok (:arrow-type t :name "(x: Any)Unit" :type-id 7 :result-type (:arrow-type nil :name "Unit" :type-id 5 :decl-as class :full-name "scala.Unit" :type-args nil :members nil :pos nil :outer-type-id nil) :param-sections ((:params (("x" (:arrow-type nil :name "Any" :type-id 6 :decl-as class :full-name "scala.Any" :type-args nil :members nil :pos nil :outer-type-id nil))) :is-implicit nil)))) 8)"""
+
+      val typeAtPoint = responseExtractor.getTypeAtPoint(responseMessage)
+
+      if (typeAtPoint.isDefined) {
+        assert(
+          typeAtPoint.get.name === "type1" &&
+            typeAtPoint.get.fullName === "FOO.type1" &&
+            typeAtPoint.get.typeId == 7
+        )
+        /// TODO include more asserts...          
+      }
+      //else fail() 
+    }
+
     ignore("should extract a TypeInspectInfo object (InspectTypeAtPointReq)") {
       //      val typeInfoStr = """(:arrow-type nil :name "type1" :type-id 7 :decl-as method :full-name "FOO.type1" :type-args nil :members nil :pos nil :outer-type-id 8)"""
       //      val typeInspectStr = s"""(:type $typeInfoStr :companion-id 1 :interfaces ((:type """ + typeInfoStr + """ :via-view "DEF")) :info-type typeInspect)"""

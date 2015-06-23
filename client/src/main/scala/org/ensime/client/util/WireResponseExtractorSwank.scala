@@ -66,22 +66,59 @@ class WireResponseExtractorSwank extends WireResponseExtractor {
   }
 
   def getTypeAtPoint(msg: String): Option[TypeInfo] = {
-    val t = SexpParser.parse(dropResponseEnvelope(msg)).convertTo[BasicTypeInfo]
-    Some(t)
+    if (msg.contains("(:arrow-type t")) {
+      println("trying ArrowTypeInfo")
+      try {
+        val t = SexpParser.parse(dropResponseEnvelope(msg)).convertTo[ArrowTypeInfo]
+        Some(t)
+      } catch {
+        case e: Throwable =>
+          println("[WireRepsonseExtractor] \t Incoming messing could not be converted to ArrowTypeInfo. " + e.getMessage +
+            "\nStackTrace:" + e.getStackTrace.mkString("\n") + "\n" + "\nOrg. Msg: \n" + msg + "\n----")
+          return None
+      }
+    } else {
+
+      try {
+        val t = SexpParser.parse(dropResponseEnvelope(msg)).convertTo[BasicTypeInfo]
+        Some(t)
+      } catch {
+        case e: Throwable =>
+          println("[WireRepsonseExtractor] \t Incoming messing could not be converted to BasicTypeInfo. " + e.getMessage +
+            "\nStackTrace:" + e.getStackTrace.mkString("\n") + "\n" + "\nOrg. Msg: \n" + msg + "\n----")
+          return None
+      }
+
+    }
   }
 
   def getInspectTypeAtPoint(msg: String): Option[TypeInspectInfo] = {
-    ???
-    println(msg)
-    println(dropResponseEnvelope(msg))
+
+    //    println(msg)
+    //    println(dropResponseEnvelope(msg))
     println(SexpParser.parse(dropResponseEnvelope(msg)))
-    val t = SexpParser.parse(dropResponseEnvelope(msg)).convertTo[TypeInspectInfo]
-    Some(t)
+    try {
+      val t = SexpParser.parse(dropResponseEnvelope(msg)).convertTo[TypeInspectInfo]
+      return Some(t)
+    } catch {
+      case e: Throwable =>
+        println("[WireRepsonseExtractor] \t Incoming messing could not be converted to TypeInspectInfo. " + e.getMessage +
+          "\nStackTrace:" + e.getStackTrace.mkString("\n") + "\n" + "\nOrg. Msg: \n" + msg + "\n----")
+        return None
+    }
+
   }
 
   def getInspectPackageByPath(msg: String): Option[PackageInfo] = {
-    val t = SexpParser.parse(dropResponseEnvelope(msg)).convertTo[PackageInfo]
-    Some(t)
+    try {
+      val t = SexpParser.parse(dropResponseEnvelope(msg)).convertTo[PackageInfo]
+      return Some(t)
+    } catch {
+      case e: Throwable =>
+        println("[WireRepsonseExtractor] \t Incoming messing could not be converted to PackageInfo. " + e.getMessage +
+          "\nStackTrace:" + e.getStackTrace.mkString("\n") + "\n" + "\nOrg. Msg: \n" + msg + "\n----")
+        return None
+    }
   }
 
   def getUsesOfSymbolsAtPoint(msg: String): Future[List[ERangePosition]] = { ??? }

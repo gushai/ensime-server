@@ -10,7 +10,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class TestClient extends FunSpec with BeforeAndAfterAll {
 
   val host = "127.0.0.1"
-  val port = 43947
+  val port = 33965
 
   val logString = "[TestClient]\t"
 
@@ -94,6 +94,15 @@ class TestClient extends FunSpec with BeforeAndAfterAll {
       val rangeTo = 151
 
       val typeAtPoint = client.typeAtPoint(file, new OffsetRange(rangeFrom, rangeTo))
+
+      typeAtPoint onComplete {
+        case Success(tI) => {
+          if (tI.isDefined) {
+            println("TypeAtPointReq:\t" + tI.get.fullName + " \\\\ ")
+          }
+        }
+        case Failure(t) => fail()
+      }
     }
 
     ignore("should send a InspectTypeAtPoint") {

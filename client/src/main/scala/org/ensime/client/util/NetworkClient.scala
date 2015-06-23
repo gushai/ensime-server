@@ -126,7 +126,9 @@ class NetworkClient(host: String, port: Int) {
       msgId match {
         case Some(id) =>
           if (msg.length > 150) {
-            log("[Incoming Message]\t" + "Id: " + id + "\t" + msg.substring(0, 150) + "...")
+            // Removed the substring restriction for debugging...
+            //log("[Incoming Message]\t" + "Id: " + id + "\t" + msg.substring(0, 150) + "...")
+            log("[Incoming Message]\t" + "Id: " + id + "\t" + msg)
           } else {
             log("[Incoming Message]\t" + "Id: " + id + "\t" + msg)
           }

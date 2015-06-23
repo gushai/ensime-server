@@ -258,7 +258,8 @@ lazy val client = Project("client", file("client")).dependsOn(
       "com.typesafe.akka" %% "akka-actor" % "2.3.9",
       "org.scala-refactoring" %% "org.scala-refactoring.library" % "0.6.2",
       "commons-lang" % "commons-lang" % "2.6",
-      "io.spray" %% "spray-can" % "1.3.3"
+      "io.spray" %% "spray-can" % "1.3.3",
+      "org.scalariform" %% "scalariform" % "0.1.6"	
     ) ++ testLibs(scalaVersion.value, "it,test")
   )
 

@@ -20,10 +20,9 @@ object Client {
 
   def main(args: Array[String]): Unit = {
     val host = "127.0.0.1"
-    val port = 55222
+    val port = args(0).toInt
     val client = new Client(host, port)
     client.initialize()
-
     client.close()
     // 
   }
@@ -103,7 +102,7 @@ class Client(host: String, port: Int) extends EnsimeAsyncApi {
       }
       case _ => {
         /// TODO: Include message information? 
-        throw new Exception("Unsuccessful response. ")
+        throw new Exception("Unsuccessful response: ConnectionInfo Message: ")
       }
 
     }
