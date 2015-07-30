@@ -15,3 +15,4 @@ addSbtPlugin("org.scalariform" % "sbt-scalariform" % "1.4.0")
 
 scalacOptions in Compile ++= Seq("-feature", "-deprecation")
 
+addSbtPlugin("com.typesafe.sbteclipse" % "sbteclipse-plugin" % "2.5.0")

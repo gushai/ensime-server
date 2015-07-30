@@ -270,9 +270,38 @@ object EnsimeBuild extends Build with JdkResolver {
     ) ++ testLibs(scalaVersion.value, "it,test")
   )
 
+  lazy val client = Project("client", file("client")).dependsOn(
+    core, swank, jerk,
+    sexpress % "test->test",
+    swank % "test->test",
+    // depend on "it" dependencies in "test" or sbt adds them to the release deps!
+    // https://github.com/sbt/sbt/issues/1888
+    core % "test->test",
+    core % "it->it",
+    testingDocs % "test,it"
+  ).configs(It).settings (
+    commonSettings
+  ).settings (
+    inConfig(It)(Defaults.testSettings)
+  ).settings (
+    commonItSettings
+  ).settings (
+    unmanagedJars in Compile += JavaTools,
+    libraryDependencies ++= Seq(
+      "io.spray" %% "spray-can" % "1.3.3",
+      "io.spray" %% "spray-routing" % "1.3.3",
+      "com.typesafe.akka" %% "akka-stream-experimental" % streamsVersion,
+      "com.typesafe.akka" %% "akka-http-core-experimental" % streamsVersion,
+      "com.typesafe.akka" %% "akka-http-experimental" % streamsVersion,
+      "com.typesafe.akka" %% "akka-http-spray-json-experimental" % streamsVersion,
+      "com.typesafe.akka" %% "akka-http-testkit-experimental" % streamsVersion % "test,it",
+	"com.typesafe.scala-logging" %% "scala-logging" % "3.1.0"
+    ) ++ testLibs(scalaVersion.value, "it,test")
+  )
+
   // manual root project so we can exclude the testing projects from publication
   lazy val root = Project(id = "ensime", base = file("."), settings = commonSettings) aggregate (
-    api, sexpress, jerk, swank, core, server
+    api, sexpress, jerk, swank, core, server, client
   ) dependsOn (server)
 }
 
