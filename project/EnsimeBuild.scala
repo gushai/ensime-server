@@ -3,7 +3,7 @@ import java.io._
 import com.typesafe.sbt.SbtScalariform._
 import sbt.Keys._
 import sbt.{IntegrationTest => It, _}
-import scoverage.ScoverageSbtPlugin.ScoverageKeys
+//import scoverage.ScoverageSbtPlugin.ScoverageKeys
 
 import scala.util.{Properties, Try}
 
@@ -18,8 +18,16 @@ object EnsimeBuild extends Build with JdkResolver {
   // common
   lazy val basicSettings = Seq(
     organization := "org.ensime",
-    scalaVersion := "2.11.6",
-    version := "0.9.10-SNAPSHOT"
+    scalaVersion := "2.11.7",
+    version := "0.9.10-SNAPSHOT",
+
+    dependencyOverrides ++= Set(
+      "org.scala-lang" % "scala-reflect" % scalaVersion.value,
+      "org.scala-lang.modules" %% "scala-xml" % "1.0.4",
+      "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.4",
+      "org.slf4j" % "slf4j-api" % "1.7.12",
+      "com.google.guava" % "guava" % "18.0"
+    )
   )
   val isEmacs = sys.env.get("TERM") == Some("dumb")
 
@@ -39,6 +47,7 @@ object EnsimeBuild extends Build with JdkResolver {
   }.getOrElse(Nil)
 
   lazy val commonSettings = scalariformSettings ++ basicSettings ++ Seq(
+    //resolvers += Resolver.sonatypeRepo("snapshots"),
     scalacOptions in Compile ++= Seq(
       // uncomment this to debug implicit resolution compilation problems
       //"-Xlog-implicits",
@@ -56,10 +65,11 @@ object EnsimeBuild extends Build with JdkResolver {
     parallelExecution in Test := true,
     testForkedParallel in Test := true,
     javaOptions ++= Seq("-XX:MaxPermSize=256m", "-Xmx2g", "-XX:+UseConcMarkSweepGC"),
-    javaOptions ++= yourkitAgent,
+    javaOptions in run ++= yourkitAgent,
     javaOptions in Test += "-Dlogback.configurationFile=../logback-test.xml",
     testOptions in Test ++= noColorIfEmacs,
-    updateOptions := updateOptions.value.withCachedResolution(true),
+    // updateCaching is still missing things --- e.g. shapeless in core/it:test
+    //updateOptions := updateOptions.value.withCachedResolution(true),
     licenses := Seq("BSD 3 Clause" -> url("http://opensource.org/licenses/BSD-3-Clause")),
     homepage := Some(url("http://github.com/ensime/ensime-server")),
     publishTo <<= version { v: String =>
@@ -74,17 +84,51 @@ object EnsimeBuild extends Build with JdkResolver {
     )
   )
 
+  lazy val commonItSettings = scalariformSettingsWithIt ++ Seq(
+    // careful: parallel forks are causing weird failures
+    // https://github.com/sbt/sbt/issues/1890
+    parallelExecution in It := false,
+    // https://github.com/sbt/sbt/issues/1891
+    // this is supposed to set the number of forked JVMs, but it doesn't
+    // concurrentRestrictions in Global := Seq(
+    //   Tags.limit(Tags.ForkedTestGroup, 4)
+    // ),
+    fork in It := true,
+    testForkedParallel in It := true,
+    javaOptions in It += "-Dfile.encoding=UTF8", // for file cloning
+    testOptions in It ++= noColorIfEmacs,
+
+    // FIXME: do we still need these?
+    internalDependencyClasspath in Compile += { Attributed.blank(JavaTools) },
+    internalDependencyClasspath in Test += { Attributed.blank(JavaTools) },
+    internalDependencyClasspath in It += { Attributed.blank(JavaTools) },
+
+    javaOptions in It ++= Seq(
+      "-Dlogback.configurationFile=../logback-it.xml"
+    )
+  )
+
+  ////////////////////////////////////////////////
+  // common dependencies
+  lazy val pimpathon = "com.github.stacycurl" %% "pimpathon-core" % "1.5.0"
+  lazy val shapeless = "com.chuusai" %% "shapeless" % "2.2.4"
+  lazy val logback = Seq(
+    "ch.qos.logback" % "logback-classic" % "1.1.3",
+    "org.slf4j" % "jul-to-slf4j" % "1.7.12",
+    "org.slf4j" % "jcl-over-slf4j" % "1.7.12"
+  )
+  val akkaVersion = "2.3.12"
+  val streamsVersion = "1.0"
+
   ////////////////////////////////////////////////
   // utils
   def testLibs(scalaV: String, config: String = "test") = Seq(
-    "org.scalatest" %% "scalatest" % "2.2.4" % config,
-    "org.scalamock" %% "scalamock-scalatest-support" % "3.2.1" % config,
+    "org.scalatest" %% "scalatest" % "2.2.5" % config,
+    "org.scalamock" %% "scalamock-scalatest-support" % "3.2.2" % config,
     "org.scalacheck" %% "scalacheck" % "1.12.1" % config,
-    "com.typesafe.akka" %% "akka-testkit" % "2.3.9" % config,
-    // workaround old deps coming from scalatest
-    "org.scala-lang" % "scala-reflect" % scalaV % config,
-    "org.scala-lang.modules" %% "scala-xml" % "1.0.3" % config
-  )
+    "com.typesafe.akka" %% "akka-testkit" % akkaVersion % config,
+    "com.typesafe.akka" %% "akka-slf4j" % akkaVersion % config
+  ) ++ logback.map(_ % config)
 
   def jars(cp: Classpath): String = {
     for {
@@ -103,92 +147,80 @@ object EnsimeBuild extends Build with JdkResolver {
   lazy val sexpress = Project("sexpress", file("sexpress"), settings = commonSettings) settings (
     licenses := Seq("LGPL 3.0" -> url("http://www.gnu.org/licenses/lgpl-3.0.txt")),
     libraryDependencies ++= Seq(
-      "org.scala-lang" % "scala-reflect" % scalaVersion.value,
-      "com.chuusai" %% "shapeless" % "2.2.0-RC4",
+      shapeless,
       "org.parboiled" %% "parboiled-scala" % "1.1.7",
-      // perhaps drop the pimpathon dependency here in the interest of
-      // minimising deps and move to server only
-      "com.github.stacycurl" %% "pimpathon-core" % "1.4.0",
+      pimpathon,
       "com.google.guava" % "guava" % "18.0" % "test"
     ) ++ testLibs(scalaVersion.value)
   )
 
   lazy val api = Project("api", file("api"), settings = commonSettings) settings (
     libraryDependencies ++= Seq(
-      "com.github.stacycurl" %% "pimpathon-core" % "1.4.0",
-      "org.scalariform" %% "scalariform" % "0.1.6"
+      "org.scalariform" %% "scalariform" % "0.1.6" intransitive(),
+      pimpathon
     ) ++ testLibs(scalaVersion.value)
   )
 
-  lazy val swank = Project("swank", file("swank"), settings = commonSettings) dependsOn (
-    api, sexpress, sexpress % "test->test"
+  // the JSON protocol
+  lazy val jerk = Project("jerk", file("jerk"), settings = commonSettings) dependsOn (
+    api,
+    api % "test->test" // for the test data
   ) settings (
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-slf4j" % "2.3.9",
-      "ch.qos.logback" % "logback-classic" % "1.1.3",
-      "org.slf4j" % "jul-to-slf4j" % "1.7.12",
-      "org.slf4j" % "jcl-over-slf4j" % "1.7.12"
+      "com.github.fommil" %% "spray-json-shapeless" % "1.0.0",
+      "com.typesafe.akka" %% "akka-slf4j" % akkaVersion
+    ) ++ testLibs(scalaVersion.value)
+  )
+
+  // the S-Exp protocol
+  lazy val swank = Project("swank", file("swank"), settings = commonSettings) dependsOn (
+    api,
+    api % "test->test", // for the test data
+    sexpress
+  ) settings (
+    libraryDependencies ++= Seq(
+      "com.typesafe.akka" %% "akka-slf4j" % akkaVersion
     ) ++ testLibs(scalaVersion.value)
   )
 
   lazy val testingEmpty = Project("testingEmpty", file("testing/empty"), settings = basicSettings).settings(
-    ScoverageKeys.coverageExcludedPackages := ".*"
+    //ScoverageKeys.coverageExcludedPackages := ".*"
   )
 
   lazy val testingSimple = Project("testingSimple", file("testing/simple"), settings = basicSettings) settings (
-    libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.4" % "test" intransitive(),
-    ScoverageKeys.coverageExcludedPackages := ".*"
+    //ScoverageKeys.coverageExcludedPackages := ".*",
+    libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.5" % "test" intransitive()
   )
 
   lazy val testingDebug = Project("testingDebug", file("testing/debug"), settings = basicSettings).settings(
-    ScoverageKeys.coverageExcludedPackages := ".*"
+    //ScoverageKeys.coverageExcludedPackages := ".*"
   )
 
   lazy val testingDocs = Project("testingDocs", file("testing/docs"), settings = basicSettings).settings(
+    //ScoverageKeys.coverageExcludedPackages := ".*",
     libraryDependencies ++= Seq(
       // specifically using ForecastIOLib version 1.5.1 for javadoc 1.8 output
-      "com.github.dvdme" %  "ForecastIOLib" % "1.5.1",
-      "com.google.guava" % "guava" % "18.0",
-      "commons-io" % "commons-io" % "2.4"
-    ),
-    ScoverageKeys.coverageExcludedPackages := ".*"
+      "com.github.dvdme" %  "ForecastIOLib" % "1.5.1" intransitive(),
+      "com.google.guava" % "guava" % "18.0" intransitive(),
+      "commons-io" % "commons-io" % "2.4" intransitive()
+    )
   )
 
-  lazy val server = Project("server", file("server")).dependsOn(
-    api, swank,
-    sexpress % "test->test",
-    swank % "test->test",
+  lazy val core = Project("core", file("core")).dependsOn(
+    api, sexpress,
+    api % "test->test", // for the interpolator
     // depend on "it" dependencies in "test" or sbt adds them to the release deps!
     // https://github.com/sbt/sbt/issues/1888
     testingEmpty % "test,it",
     testingSimple % "test,it",
-    testingDebug % "test,it",
-    testingDocs % "test,it"
+    testingDebug % "test,it"
   ).configs(It).settings (
     commonSettings
   ).settings (
     inConfig(It)(Defaults.testSettings)
   ).settings (
-    scalariformSettingsWithIt
-  ).settings (
-    // careful: parallel forks are causing weird failures
-    // https://github.com/sbt/sbt/issues/1890
-    parallelExecution in It := false,
-    // https://github.com/sbt/sbt/issues/1891
-    // this is supposed to set the number of forked JVMs, but it doesn't
-    // concurrentRestrictions in Global := Seq(
-    //   Tags.limit(Tags.ForkedTestGroup, 4)
-    // ),
-    fork in It := true,
-    testForkedParallel in It := true,
-    javaOptions in It += "-Dfile.encoding=UTF8", // for file cloning
-    testOptions in It ++= noColorIfEmacs,
-    internalDependencyClasspath in Compile += { Attributed.blank(JavaTools) },
-    internalDependencyClasspath in Test += { Attributed.blank(JavaTools) },
-    internalDependencyClasspath in It += { Attributed.blank(JavaTools) },
-    javaOptions in It ++= Seq(
-      "-Dlogback.configurationFile=../logback-it.xml"
-    ),
+    commonItSettings
+  ).settings(
     libraryDependencies ++= Seq(
       "com.h2database" % "h2" % "1.4.187",
       "com.typesafe.slick" %% "slick" % "2.1.0",
@@ -197,19 +229,50 @@ object EnsimeBuild extends Build with JdkResolver {
       // lucene 4.8+ needs Java 7: http://www.gossamer-threads.com/lists/lucene/general/225300
       "org.apache.lucene" % "lucene-core" % "4.7.2",
       "org.apache.lucene" % "lucene-analyzers-common" % "4.7.2",
-      "org.ow2.asm" % "asm-commons" % "5.0.3",
-      "org.ow2.asm" % "asm-util" % "5.0.3",
+      "org.ow2.asm" % "asm-commons" % "5.0.4",
+      "org.ow2.asm" % "asm-util" % "5.0.4",
       "org.scala-lang" % "scala-compiler" % scalaVersion.value,
       "org.scala-lang" % "scalap" % scalaVersion.value,
-      "com.typesafe.akka" %% "akka-actor" % "2.3.9",
+      "com.typesafe.akka" %% "akka-actor" % akkaVersion,
+      "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "org.scala-refactoring" %% "org.scala-refactoring.library" % "0.6.2",
+      // TODO: would be good to loose direct commons deps
       "commons-lang" % "commons-lang" % "2.6",
-      "io.spray" %% "spray-can" % "1.3.3"
+      "commons-io" % "commons-io" % "2.4" % "test,it"
+    ) ++ logback ++ testLibs(scalaVersion.value, "it,test")
+  )
+
+  lazy val server = Project("server", file("server")).dependsOn(
+    core, swank, jerk,
+    sexpress % "test->test",
+    swank % "test->test",
+    // depend on "it" dependencies in "test" or sbt adds them to the release deps!
+    // https://github.com/sbt/sbt/issues/1888
+    core % "test->test",
+    core % "it->it",
+    testingDocs % "test,it"
+  ).configs(It).settings (
+    commonSettings
+  ).settings (
+    inConfig(It)(Defaults.testSettings)
+  ).settings (
+    commonItSettings
+  ).settings (
+    unmanagedJars in Compile += JavaTools,
+    libraryDependencies ++= Seq(
+      "io.spray" %% "spray-can" % "1.3.3",
+      "io.spray" %% "spray-routing" % "1.3.3",
+      "com.typesafe.akka" %% "akka-stream-experimental" % streamsVersion,
+      "com.typesafe.akka" %% "akka-http-core-experimental" % streamsVersion,
+      "com.typesafe.akka" %% "akka-http-experimental" % streamsVersion,
+      "com.typesafe.akka" %% "akka-http-spray-json-experimental" % streamsVersion,
+      "com.typesafe.akka" %% "akka-http-testkit-experimental" % streamsVersion % "test,it"
     ) ++ testLibs(scalaVersion.value, "it,test")
   )
 
+  // manual root project so we can exclude the testing projects from publication
   lazy val root = Project(id = "ensime", base = file("."), settings = commonSettings) aggregate (
-    api, sexpress, swank, server
+    api, sexpress, jerk, swank, core, server
   ) dependsOn (server)
 }
 

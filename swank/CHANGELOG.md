@@ -1,6 +1,15 @@
-Protocol Version: 0.8.14 (Must match version at ConnectionInfo.protocolVersion)
+Protocol Version: 0.8.17 (Must match version at ConnectionInfo.protocolVersion)
 
 Protocol Change Log:
+  0.8.17
+    Added new symbol designation type: "deprecated"
+  0.8.16
+    Added swank:implicit-info
+    Added new symbol designation types: "implicitConversion" and "implicitParams"
+  0.8.15
+    Removed all *undo* requests: they were too unreliable
+    Removed all *patch* requests: they were too unreliable
+    Removed replconfig: clients encouraged to read config directly
   0.8.14
     Added swank:symbol-by-name
     Removed swank:member-by-name

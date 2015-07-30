@@ -1,25 +1,26 @@
 package org.ensime.server
 
+import akka.actor._
+import akka.event.slf4j.SLF4JLogging
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.Http.ServerBinding
+import akka.pattern.ask
+import akka.stream.ActorMaterializer
+import akka.util.Timeout
+import com.google.common.base.Charsets
+import com.google.common.io.Files
 import java.io._
 import java.net.{ InetAddress, ServerSocket, Socket }
 import java.util.concurrent.atomic.AtomicBoolean
-
-import akka.actor._
-import akka.event.LoggingReceive
-import com.google.common.base.Charsets
-import com.google.common.io.Files
-import org.ensime.EnsimeApi
+import org.ensime.api._
 import org.ensime.config._
-import org.ensime.core.Project
-import org.ensime.server.protocol._
-import org.ensime.server.protocol.swank.SwankProtocol
-import org.ensime.sexp.Sexp
+import org.ensime.core._
 import org.slf4j._
 import org.slf4j.bridge.SLF4JBridgeHandler
-
-import scala.concurrent.Future
-import scala.util.Properties
+import scala.concurrent.duration._
+import scala.util._
 import scala.util.Properties._
+import akka.http.scaladsl.server.RouteResult.route2HandlerFlow
 
 object Server {
   SLF4JBridgeHandler.removeHandlersForRootLogger()
@@ -36,7 +37,7 @@ object Server {
     if (!ensimeFile.exists() || !ensimeFile.isFile)
       throw new RuntimeException(s".ensime file ($ensimeFile) not found")
 
-    val config = try {
+    implicit val config = try {
       EnsimeConfigProtocol.parse(Files.toString(ensimeFile, Charsets.UTF_8))
     } catch {
       case e: Throwable =>
@@ -44,179 +45,111 @@ object Server {
         throw e
     }
 
-    initialiseServer(config)
+    val protocol: Protocol = propOrElse("ensime.protocol", "swank") match {
+      case "swank" => new SwankProtocol
+      case "jerk" => new JerkProtocol
+      case other => throw new IllegalArgumentException(s"$other is not a valid ENSIME protocol")
+    }
+
+    new Server(protocol).start()
   }
 
-  /**
-   * Initialise a server against the given configuration
-   * @param config The Ensime configuration to use.
-   * @return A tuple of the server instance and a future that will complete when the system is ready for user actions.
-   */
-  def initialiseServer(config: EnsimeConfig): (Server, Future[Unit]) = {
-    val server = new Server(config, "127.0.0.1", 0,
-      (_, peerRef, rpcTarget) => { new SwankProtocol(peerRef, rpcTarget) })
-    val readyFuture = server.start()
-    (server, readyFuture)
-  }
 }
 
+/**
+ * The Legacy Socket handler is a bit nasty --- it was originally
+ * written before there were any decent Scala libraries for IO so we
+ * end up doing Socket loops in Threads.
+ *
+ * It's crying out to be rewritten with akka.io.
+ */
 class Server(
-    val config: EnsimeConfig,
-    host: String,
-    requestedPort: Int,
-    connectionCreator: (ActorSystem, ActorRef, EnsimeApi) => Protocol[Sexp]
-) {
-
-  import org.ensime.server.Server.log
-
+    protocol: Protocol,
+    interface: String = "127.0.0.1"
+)(
+    implicit
+    config: EnsimeConfig
+) extends SLF4JLogging {
   // the config file parsing will attempt to create directories that are expected
-  require(config.cacheDir.isDirectory, "" + config.cacheDir + " is not a valid cache directory")
+  require(config.cacheDir.isDirectory, s"${config.cacheDir} is not a valid cache directory")
 
-  val actorSystem = ActorSystem.create("EnsimeServer")
-  // TODO move this to only be started when we want to receive
-  val listener = new ServerSocket(requestedPort, 0, InetAddress.getByName(host))
-  val actualPort = listener.getLocalPort
+  implicit private val system = ActorSystem("ENSIME")
+  implicit private val mat = ActorMaterializer()
+  implicit private val timeout = Timeout(10 seconds)
 
-  log.info("ENSIME Server on " + host + ":" + actualPort)
+  val broadcaster = system.actorOf(Broadcaster(), "broadcaster")
+  val project = system.actorOf(Project(broadcaster), "project")
+  val docs = system.actorOf(Props(new DocServer(config)), "docs")
+
+  val webserver = new WebServerImpl(project, broadcaster, docs)
+
+  // async start the HTTP Server
+  Http().bindAndHandle(webserver.route, interface, 0).onSuccess {
+    case ServerBinding(addr) =>
+      log.info(s"ENSIME HTTP on ${addr.getAddress}")
+      writePort(config.cacheDir, addr.getPort, "http")
+  }(system.dispatcher)
+
+  // synchronously start the Socket Server
+  private val listener = new ServerSocket(0, 0, InetAddress.getByName(interface))
+  private val hasShutdownFlag = new AtomicBoolean
+  private var loop: Thread = _
+
+  log.info("Starting ENSIME TCP on " + interface + ":" + listener.getLocalPort)
   log.info(Environment.info)
 
-  writePort(config.cacheDir, actualPort)
+  writePort(config.cacheDir, listener.getLocalPort, "port")
 
-  val project = new Project(config, actorSystem)
-
-  /**
-   * Start the server
-   * @return A future representing when the server is ready to process events
-   */
-  def start(): Future[Unit] = {
-    val readyFuture = project.initProject()
-    startSocketListener()
-    readyFuture
-  }
-
-  private val hasShutdownFlag = new AtomicBoolean(false)
-  def startSocketListener(): Unit = {
-    val t = new Thread(new Runnable() {
-      def run(): Unit = {
+  def start(): Unit = {
+    loop = new Thread {
+      override def run(): Unit = {
         try {
           while (!hasShutdownFlag.get()) {
-            try {
-              val socket = listener.accept()
-              log.info("Got connection, creating handler...")
-              actorSystem.actorOf(Props(classOf[SocketHandler], socket, project, connectionCreator))
-            } catch {
-              case e: IOException =>
-                if (!hasShutdownFlag.get())
-                  log.error("ENSIME Server socket listener error: ", e)
-            }
+            val socket = listener.accept()
+            system.actorOf(SocketHandler(protocol, socket, broadcaster, project, docs))
           }
-        } finally {
-          listener.close()
-        }
+        } catch {
+          case e: Exception =>
+            if (!hasShutdownFlag.get())
+              log.error("ENSIME Server socket listener", e)
+        } finally listener.close()
       }
-    })
-    t.start()
+    }
+    loop.setName("ENSIME Connection Loop")
+    loop.start()
   }
 
+  // TODO: attach this to the appropriate KILL signal
   def shutdown(): Unit = {
-    log.info("Shutting down server")
     hasShutdownFlag.set(true)
-    listener.close()
-    project.shutdown()
-    actorSystem.shutdown()
-    log.info("Awaiting actor system shutdown")
-    actorSystem.awaitTermination()
+    Try(loop.interrupt())
+
+    log.info("Shutting down the ActorSystem")
+    Try(system.shutdown())
+
+    log.info("Closing Socket listener")
+    Try(listener.close())
+
+    log.info("Awaiting actor system termination")
+    Try(system.awaitTermination())
+
     log.info("Shutdown complete")
   }
-  private def writePort(cacheDir: File, port: Int): Unit = {
-    val portfile = new File(cacheDir, "port")
+
+  private def writePort(cacheDir: File, port: Int, name: String): Unit = {
+    val portfile = new File(cacheDir, name)
     if (!portfile.exists()) {
       log.info("creating portfile " + portfile)
       portfile.createNewFile()
-    } else if (portfile.length > 0)
-      // LEGACY: older clients create an empty file
-      throw new IOException(
-        "An ENSIME server might be open already for this project. " +
-          "If you are sure this is not the case, please delete " +
-          portfile.getAbsolutePath + " and try again"
-      )
+    } else throw new IOException(
+      "An ENSIME server might be open already for this project. " +
+        "If you are sure this is not the case, please delete " +
+        portfile.getAbsolutePath + " and try again"
+    )
 
     portfile.deleteOnExit()
     val out = new PrintWriter(portfile)
     try out.println(port)
     finally out.close()
-  }
-}
-
-case object SocketClosed
-
-// these must be destroyed
-case class IncomingMessageEvent(obj: Sexp)
-case class OutgoingMessageEvent(obj: Sexp)
-
-class SocketReader(socket: Socket, protocol: Protocol[Sexp], handler: ActorRef) extends Thread {
-  val log = LoggerFactory.getLogger(this.getClass)
-  val in = new BufferedInputStream(socket.getInputStream)
-  val reader = new InputStreamReader(in, "UTF-8")
-
-  override def run(): Unit = {
-    try {
-      while (true) {
-        val msg = protocol.readMessage(reader)
-        handler ! IncomingMessageEvent(msg)
-      }
-    } catch {
-      case e: IOException =>
-        log.error("Error in socket reader: ", e)
-        Properties.envOrNone("ensime.explode.on.disconnect") match {
-          case Some(_) =>
-            log.warn("tick, tick, tick, tick... boom!")
-            System.exit(-1)
-          case None =>
-            handler ! SocketClosed
-        }
-    }
-  }
-}
-
-/**
- * Create a socket handler
- * @param socket The incoming socket
- * @param connectionCreator Function to create protocol instance given actorSystem and the peer (this) ref
- */
-class SocketHandler(
-    socket: Socket,
-    rpcTarget: EnsimeApi,
-    connectionCreator: (ActorSystem, ActorRef, EnsimeApi) => Protocol[Sexp]
-) extends Actor with ActorLogging {
-  val protocol = connectionCreator(context.system, self, rpcTarget)
-
-  val reader = new SocketReader(socket, protocol, self)
-  val out = new BufferedOutputStream(socket.getOutputStream)
-
-  def write(value: Sexp): Unit = {
-    try {
-      protocol.writeMessage(value, out)
-    } catch {
-      case e: IOException =>
-        log.error(e, "Write to client failed")
-        context.stop(self)
-    }
-  }
-
-  override def preStart(): Unit = {
-    reader.start()
-  }
-
-  override def receive = LoggingReceive {
-    case message: Sexp =>
-      write(message)
-    case IncomingMessageEvent(message) =>
-      protocol.handleIncomingMessage(message)
-    case OutgoingMessageEvent(message) =>
-      write(message)
-    case SocketClosed =>
-      log.error("Socket closed, stopping self")
-      context.stop(self)
   }
 }
