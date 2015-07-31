@@ -95,6 +95,7 @@ abstract class NetworkClientMain(implicit context: NetworkClientContext)
             try {
               if (in.available() != 0) {
                 val msg = readIncomingMessageFromInputStream(in);
+                //                println("[Listener Thread!] " + msg)
                 handleReceivedMessage(msg)
               }
             } catch {
@@ -151,6 +152,8 @@ abstract class NetworkClientMain(implicit context: NetworkClientContext)
    */
   def sendMessage(msg: String): Unit = {
     val msgBytes = (addPaddingToOutgoingMessage(msg) + msg).getBytes("UTF-8")
+
+    println("Sending: " + msg)
 
     if (context.verbose)
       logger.info("Bytes Send: " + msgBytes.toString())

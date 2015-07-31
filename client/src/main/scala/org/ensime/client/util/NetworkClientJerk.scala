@@ -11,7 +11,7 @@ class NetworkClientJerk(implicit context: NetworkClientContext) extends NetworkC
   }
 
   def handleReceivedMessage(msg: String): Unit = {
-    logger.info("[JERK incoming message] \n" + msg + "\n")
+    println("[handleReceivedMessage]" + msg + "\n")
   }
 
 }
