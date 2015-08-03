@@ -1,274 +1,315 @@
 package org.ensime.client
-//
-//import org.ensime.EnsimeAsyncApi
-//import java.io.File
-//import org.ensime.core._
-//import org.ensime.model._
-//import org.ensime.server.ConnectionInfo
-//import org.ensime.util.{ FileRange, RefactorType }
-//import scala.concurrent.{ Future, Promise }
-//import scala.util.{ Success, Failure }
-//import java.util.concurrent.atomic.AtomicInteger
-//import org.ensime.server.protocol._
-//import org.ensime.client.util.WireFormatterSwank
-//import org.ensime.client.util.WireResponseExtractorSwank
-//import org.ensime.server.protocol.RpcRequest
-//import scala.concurrent.ExecutionContext.Implicits.global
-//import com.typesafe.scalalogging.LazyLogging
-//
+
+import java.io.File
+import scala.concurrent.{ Future, Promise }
+import scala.util.{ Success, Failure }
+import java.util.concurrent.atomic.AtomicInteger
+import scala.concurrent.ExecutionContext.Implicits.global
+import com.typesafe.scalalogging.LazyLogging
+import org.ensime.client.util.NetworkClientJerk
+import org.ensime.client.util.NetworkClientContext
+import org.ensime.api.RpcRequest
+import org.ensime.api.EnsimeServerMessage
+import org.ensime.client.util.WireFormatterJerk
+import org.ensime.api._
+
 object Client {
 
   def main(args: Array[String]): Unit = {
     val host = "127.0.0.1"
     val port = args(0).toInt
-    //    val client = new Client()(new ClientContext(host, port, true))
-    //    client.initialize()
-    //    client.close()
-    //    // 
+    val client = new Client()(new ClientContext(host, port, true))
+    client.initialize()
+    client.close()
   }
 
 }
-//
-//class ClientContext(
-//    val host: String,
-//    val port: Int,
-//    val verbose: Boolean
-//) {
-//}
-//
-//class Client(implicit context: ClientContext)
-//    extends EnsimeAsyncApi with LazyLogging {
-//
-//  private val networkClient = new NetworkClient()(new NetworkClientContext(context.host, context.port, context.verbose));
-//  private val currentCallId = new AtomicInteger(1)
-//
-//  private val wireFormatter = new WireFormatterSwank()
-//  private val responseExtractor = new WireResponseExtractorSwank()
-//
-//  /**
-//   * Sets up the network client
-//   */
-//  def initialize(): Unit = {
-//    networkClient.start()
-//  }
-//
-//  /**
-//   * Close the client
-//   */
-//  def close(): Unit = {
-//    networkClient.close()
-//  }
-//
-//  // ===========================================================================  
-//  // Helpers
-//  // ===========================================================================
-//
-//  // ===========================================================================  
-//  // 
-//  // ===========================================================================
-//
-//  /**
-//   * Send the request over the wire.
-//   */
-//  private def sendRequest(request: RpcRequest): Promise[String] = {
-//    val callId = currentCallId.getAndIncrement()
-//    val msgToBeSend = wireFormatter.toWireFormat(request, callId)
-//    val p = Promise[String]
-//    Future {
-//      networkClient.sendMessage(p, callId, msgToBeSend)
-//    }
-//    p
-//  }
-//
-//  private def sendRequestNoResponse(request: RpcRequest): Unit = {
-//    val callId = currentCallId.getAndIncrement()
-//    val msgToBeSend = wireFormatter.toWireFormat(request, callId)
-//    Future {
-//      networkClient.sendMessage(msgToBeSend)
-//    }
-//  }
-//
-//  // ===========================================================================  
-//  // EnsimeAsyncApi implementation - BEGIN
-//  // ===========================================================================
-//
-//  def connectionInfo(): Future[ConnectionInfo] = {
-//    val pResponseMessage = sendRequest(ConnectionInfoReq)
-//
-//    /// TODO: Add timeout exception! and failure...!!!
-//    val pResponseObject = Promise[ConnectionInfo]
-//
-//    pResponseMessage.future.onComplete {
-//      case msg if msg.isSuccess && responseExtractor.isSuccessfullResponse(msg.get) => {
-//        pResponseObject.success(responseExtractor.getConnectionInfo(msg.get))
-//
-//      }
-//      case _ => {
-//        /// TODO: Include message information? 
-//        throw new Exception("Unsuccessful response: ConnectionInfo Message: ")
-//      }
-//
-//    }
-//    pResponseObject.future
-//  }
-//
-//  def shutdownServer(): Unit = {
-//    sendRequestNoResponse(ShutdownServerReq)
-//  }
-//
-//  def subscribeAsync(handler: EnsimeEvent => Unit): Future[Boolean] = { ??? }
-//
-//  def peekUndo(): Future[Option[Undo]] = { ??? }
-//
-//  def execUndo(undoId: Int): Future[Either[String, UndoResult]] = { ??? }
-//
-//  def replConfig(): Future[ReplConfig] = { ??? }
-//
-//  def symbolDesignations(f: File, start: Int, end: Int, requestedTypes: List[SourceSymbol]): Future[SymbolDesignations] = {
-//    val pResponseMessage = sendRequest(SymbolDesignationsReq(f, start, end, requestedTypes))
-//
-//    /// TODO: Add timeout exception! and failure...!!!
-//    val pResponseObject = Promise[SymbolDesignations]
-//
-//    pResponseMessage.future.onComplete {
-//      case msg if msg.isSuccess && responseExtractor.isSuccessfullResponse(msg.get) => {
-//        pResponseObject.success(responseExtractor.getSymbolDesignations(msg.get))
-//
-//      }
-//      case _ => {
-//        /// TODO: Include message information? 
-//        throw new Exception("Unsuccessful response. ")
-//      }
-//
-//    }
-//    pResponseObject.future
-//  }
-//
-//  def patchSource(f: File, edits: List[PatchOp]): Unit = { ??? }
-//
-//  def typecheckFile(fileInfo: SourceFileInfo): Unit = { ??? }
-//  def typecheckFiles(fs: List[File]): Unit = { ??? }
-//  def removeFile(f: File): Unit = { ??? }
-//  def unloadAll(): Unit = { ??? }
-//  def typecheckAll(): Unit = {
-//    sendRequestNoResponse(TypecheckAllReq)
-//  }
-//  def completionsAtPoint(fileInfo: SourceFileInfo, point: Int, maxResults: Int, caseSens: Boolean, reload: Boolean): Future[CompletionInfoList] = { ??? }
-//  def packageMemberCompletion(path: String, prefix: String): Future[List[CompletionInfo]] = { ??? }
-//
-//  def inspectTypeAtPoint(fileName: File, range: OffsetRange): Future[Option[TypeInspectInfo]] = {
-//
-//    val pResponseMessage = sendRequest(InspectTypeAtPointReq(fileName, range))
-//
-//    /// TODO: Add timeout exception! and failure...!!!
-//    val pResponseObject = Promise[Option[TypeInspectInfo]]
-//
-//    pResponseMessage.future.onComplete {
-//      case msg if msg.isSuccess && responseExtractor.isSuccessfullResponse(msg.get) => {
-//        println("\n" + msg.get + "\n")
-//        pResponseObject.success(responseExtractor.getInspectTypeAtPoint(msg.get))
-//
-//      }
-//      case _ => {
-//        /// TODO: Include message information? 
-//        throw new Exception("Unsuccessful response. ")
-//      }
-//
-//    }
-//    pResponseObject.future
-//
-//  }
-//
-//  def inspectTypeById(typeId: Int): Future[Option[TypeInspectInfo]] = { ??? }
-//
-//  def inspectTypeByName(typeFQN: String): Future[Option[TypeInspectInfo]] = { ??? }
-//
-//  def symbolAtPoint(fileName: File, point: Int): Future[Option[SymbolInfo]] = { ??? }
-//
-//  def symbolByName(fullyQualifiedName: String, memberName: Option[String], signatureString: Option[String]): Future[Option[SymbolInfo]] = { ??? }
-//  def typeById(id: Int): Future[Option[TypeInfo]] = { ??? }
-//  def typeByName(name: String): Future[Option[TypeInfo]] = { ??? }
-//  def typeByNameAtPoint(name: String, f: File, range: OffsetRange): Future[Option[TypeInfo]] = { ??? }
-//  def callCompletion(id: Int): Future[Option[CallCompletionInfo]] = { ??? }
-//  def importSuggestions(f: File, point: Int, names: List[String], maxResults: Int): Future[ImportSuggestions] = { ??? }
-//  def docSignatureAtPoint(f: File, point: OffsetRange): Future[Option[DocSigPair]] = { ??? }
-//  def docSignatureForSymbol(typeFullName: String, memberName: Option[String], signatureString: Option[String]): Future[Option[DocSigPair]] = { ??? }
-//  def docUriAtPoint(f: File, point: OffsetRange): Future[Option[String]] = { ??? }
-//  def docUriForSymbol(typeFullName: String, memberName: Option[String], signatureString: Option[String]): Future[Option[String]] = { ??? }
-//  def publicSymbolSearch(names: List[String], maxResults: Int): Future[SymbolSearchResults] = { ??? }
-//  def usesOfSymAtPoint(f: File, point: Int): Future[List[ERangePosition]] = { ??? }
-//
-//  def typeAtPoint(f: File, range: OffsetRange): Future[Option[TypeInfo]] = {
-//
-//    val pResponseMessage = sendRequest(TypeAtPointReq(f, range))
-//
-//    /// TODO: Add timeout exception! and failure...!!!
-//    val pResponseObject = Promise[Option[TypeInfo]]
-//
-//    pResponseMessage.future.onComplete {
-//      case msg if msg.isSuccess && responseExtractor.isSuccessfullResponse(msg.get) => {
-//        pResponseObject.success(responseExtractor.getTypeAtPoint(msg.get))
-//      }
-//      case _ => {
-//        /// TODO: Include message information? 
-//        throw new Exception("Unsuccessful response. ")
-//      }
-//
-//    }
-//    pResponseObject.future
-//
-//  }
-//  def inspectPackageByPath(path: String): Future[Option[PackageInfo]] = {
-//
-//    val pResponseMessage = sendRequest(InspectPackageByPathReq(path))
-//
-//    /// TODO: Add timeout exception! and failure...!!!
-//    val pResponseObject = Promise[Option[PackageInfo]]
-//
-//    pResponseMessage.future.onComplete {
-//      case msg if msg.isSuccess && responseExtractor.isSuccessfullResponse(msg.get) => {
-//        logger.info(msg.get)
-//        pResponseObject.success(responseExtractor.getInspectPackageByPath(msg.get))
-//      }
-//      case _ => {
-//        /// TODO: Include message information? 
-//        throw new Exception("Unsuccessful response. ")
-//      }
-//
-//    }
-//    pResponseObject.future
-//
-//  }
-//
-//  def prepareRefactor(procId: Int, refactorDesc: RefactorDesc): Future[Either[RefactorFailure, RefactorEffect]] = { ??? }
-//  def execRefactor(procId: Int, refactorType: RefactorType): Future[Either[RefactorFailure, RefactorResult]] = { ??? }
-//  def cancelRefactor(procId: Int): Unit = { ??? }
-//
-//  def expandSelection(filename: File, start: Int, stop: Int): Future[FileRange] = { ??? }
-//  def formatFiles(filenames: List[File]): Unit = { ??? }
-//  def formatFile(fileInfo: SourceFileInfo): Future[String] = { ??? }
-//
-//  def debugStartVM(commandLine: String): Future[DebugVmStatus] = { ??? }
-//  def debugAttachVM(hostname: String, port: String): Future[DebugVmStatus] = { ??? }
-//  def debugStopVM(): Future[Boolean] = { ??? }
-//  def debugRun(): Future[Boolean] = { ??? }
-//  def debugContinue(threadId: DebugThreadId): Future[Boolean] = { ??? }
-//  def debugSetBreakpoint(file: File, line: Int): Unit = { ??? }
-//  def debugClearBreakpoint(file: File, line: Int): Unit = { ??? }
-//  def debugClearAllBreakpoints(): Unit = { ??? }
-//  def debugListBreakpoints(): Future[BreakpointList] = { ??? }
-//  def debugNext(threadId: DebugThreadId): Future[Boolean] = { ??? }
-//  def debugStep(threadId: DebugThreadId): Future[Boolean] = { ??? }
-//  def debugStepOut(threadId: DebugThreadId): Future[Boolean] = { ??? }
-//  def debugLocateName(threadId: DebugThreadId, name: String): Future[Option[DebugLocation]] = { ??? }
-//  def debugValue(loc: DebugLocation): Future[Option[DebugValue]] = { ??? }
-//  def debugToString(threadId: DebugThreadId, loc: DebugLocation): Future[Option[String]] = { ??? }
-//  def debugSetValue(loc: DebugLocation, newValue: String): Future[Boolean] = { ??? }
-//  def debugBacktrace(threadId: DebugThreadId, index: Int, count: Int): Future[DebugBacktrace] = { ??? }
-//  def debugActiveVM(): Future[Boolean] = { ??? }
-//
-//  // ===========================================================================  
-//  // EnsimeAsyncApi implementation - END
-//  // ===========================================================================
-//
-//}
+
+class ClientContext(
+  val host: String,
+  val port: Int,
+  val verbose: Boolean
+) {}
+
+class Client(implicit context: ClientContext)
+    extends EnsimeAsyncApi with LazyLogging {
+
+  private val networkClient = new NetworkClientJerk()(new NetworkClientContext(context.host, context.port, context.verbose));
+  private val currentCallId = new AtomicInteger(1)
+
+  private val wireFormatter = new WireFormatterJerk()
+
+  /**
+   * Sets up the network client
+   */
+  def initialize(): Unit = {
+    networkClient.start()
+  }
+
+  /**
+   * Close the client
+   */
+  def close(): Unit = {
+    networkClient.close()
+  }
+
+  // ===========================================================================  
+  // Helpers
+  // ===========================================================================
+
+  // TODO: General extractor for the response object
+  // Notes:
+  // - Check dependence on arrow type..
+  // ...
+
+  // ===========================================================================  
+  // 
+  // ===========================================================================
+
+  /**
+   * Send the request over the wire.
+   */
+  private def sendRequest(request: RpcRequest): Promise[EnsimeServerMessage] = {
+    val callId = currentCallId.getAndIncrement()
+    val msgToBeSend = wireFormatter.toWireFormat(request, callId)
+    val p = Promise[EnsimeServerMessage]
+    Future {
+      networkClient.sendMessage(p, callId, msgToBeSend)
+    }
+    p
+  }
+
+  private def sendRequestNoResponse(request: RpcRequest): Unit = {
+    val callId = currentCallId.getAndIncrement()
+    val msgToBeSend = wireFormatter.toWireFormat(request, callId)
+    Future {
+      networkClient.sendMessage(msgToBeSend)
+    }
+  }
+  // ===========================================================================  
+  // EnsimeAsyncApi implementation - BEGIN
+  // ===========================================================================
+  def connectionInfo(): Future[ConnectionInfo] = {
+
+    val pResponse = sendRequest(ConnectionInfoReq)
+
+    val pResponseObject = Promise[ConnectionInfo]
+
+    pResponse.future.onComplete {
+      case esm if esm.isSuccess => {
+        val payload = esm.get
+        payload match {
+          case EnsimeServerError(desc) => {
+            pResponseObject.failure(new Exception("EnsimeSeverError " + desc))
+          }
+          case ConnectionInfo(_, _, _) => {
+            pResponseObject.success(payload.asInstanceOf[ConnectionInfo])
+          }
+          case _ => {
+            pResponseObject.failure(new Exception("ConnectionInfoReq failed! " + "Unexpected ReturnType"))
+          }
+        }
+
+      } case _ => {
+        pResponseObject.failure(new Exception("ConnectionInfoReq failed!"))
+      }
+    }
+    pResponseObject.future
+  }
+
+  def symbolDesignations(file: File, start: Int, end: Int, requestedTypes: List[SourceSymbol]): Future[SymbolDesignations] = {
+    val pResponse = sendRequest(SymbolDesignationsReq(file, start, end, requestedTypes))
+
+    val pResponseObject = Promise[SymbolDesignations]
+
+    pResponse.future.onComplete {
+      case esm if esm.isSuccess => {
+        val payload = esm.get
+        payload match {
+          case EnsimeServerError(desc) => {
+            pResponseObject.failure(new Exception("EnsimeSeverError " + desc))
+          }
+          case SymbolDesignations(_, _) => {
+            pResponseObject.success(payload.asInstanceOf[SymbolDesignations])
+          }
+          case _ => {
+            pResponseObject.failure(new Exception("SymbolDesignationsReq failed! " + "Unexpected ReturnType"))
+          }
+        }
+
+      } case _ => {
+        pResponseObject.failure(new Exception("SymbolDesignationsReq failed!"))
+      }
+    }
+    pResponseObject.future
+
+  }
+  def inspectTypeAtPoint(file: File, range: OffsetRange): Future[TypeInspectInfo] = {
+
+    val pResponse = sendRequest(InspectTypeAtPointReq(file, range))
+
+    val pResponseObject = Promise[TypeInspectInfo]
+
+    pResponse.future.onComplete {
+      case esm if esm.isSuccess => {
+        val payload = esm.get
+        payload match {
+          case EnsimeServerError(desc) => {
+            pResponseObject.failure(new Exception("EnsimeSeverError " + desc))
+          }
+          case TypeInspectInfo(_, _, _, _) => { pResponseObject.success(payload.asInstanceOf[TypeInspectInfo]) }
+          case _ => {
+            pResponseObject.failure(new Exception("InspectTypeAtPointReq failed! " + "Unexpected ReturnType"))
+          }
+        }
+
+      } case _ => {
+        pResponseObject.failure(new Exception("InspectTypeAtPointReq failed!"))
+      }
+    }
+    pResponseObject.future
+
+  }
+  def symbolAtPoint(file: File, point: Int): Future[SymbolInfo] = {
+
+    val pResponse = sendRequest(SymbolAtPointReq(file, point))
+
+    val pResponseObject = Promise[SymbolInfo]
+
+    pResponse.future.onComplete {
+      case esm if esm.isSuccess => {
+        val payload = esm.get
+        payload match {
+          case EnsimeServerError(desc) => {
+            pResponseObject.failure(new Exception("EnsimeSeverError " + desc))
+          }
+          case SymbolInfo(_, _, _, _, _, _) => { pResponseObject.success(payload.asInstanceOf[SymbolInfo]) }
+          case _ => {
+            pResponseObject.failure(new Exception("SymbolAtPointReq failed! " + "Unexpected ReturnType"))
+          }
+        }
+
+      } case _ => {
+        pResponseObject.failure(new Exception("SymbolAtPointReq failed!"))
+      }
+    }
+    pResponseObject.future
+
+  }
+  //  def callCompletion(id: Int): Future[Option[CallCompletionInfo]] = { ??? }
+
+  def usesOfSymAtPoint(file: File, point: Int): Future[ERangePositions] = {
+    val pResponse = sendRequest(UsesOfSymbolAtPointReq(file, point))
+
+    val pResponseObject = Promise[ERangePositions]
+
+    pResponse.future.onComplete {
+      case esm if esm.isSuccess => {
+        val payload = esm.get
+        payload match {
+          case EnsimeServerError(desc) => {
+            pResponseObject.failure(new Exception("EnsimeSeverError " + desc))
+          }
+          case ERangePositions(_) => {
+            pResponseObject.success(payload.asInstanceOf[ERangePositions])
+          }
+          case _ => {
+            pResponseObject.failure(new Exception("UsesOfSymbolAtPointReq failed! " + "Unexpected ReturnType"))
+          }
+        }
+      } case _ => {
+        pResponseObject.failure(new Exception("UsesOfSymbolAtPointReq failed!"))
+      }
+    }
+    pResponseObject.future
+  }
+
+  def typeAtPoint(file: File, range: OffsetRange): Future[TypeInfo] = {
+
+    val pResponse = sendRequest(TypeAtPointReq(file, range))
+    // BasicTypeInfo or ArrowTypeInfo
+    val pResponseObject = Promise[TypeInfo]
+
+    pResponse.future.onComplete {
+      case esm if esm.isSuccess => {
+        val payload = esm.get
+        payload match {
+          case EnsimeServerError(desc) => {
+            pResponseObject.failure(new Exception("EnsimeSeverError " + desc))
+          }
+          case BasicTypeInfo(_, _, _, _, _, _, _, _) => {
+            pResponseObject.success(payload.asInstanceOf[BasicTypeInfo])
+          }
+          case ArrowTypeInfo(_, _, _, _) => {
+            pResponseObject.success(payload.asInstanceOf[ArrowTypeInfo])
+          }
+          case _ => {
+            pResponseObject.failure(new Exception("TypeAtPointReq failed! " + "Unexpected ReturnType"))
+          }
+        }
+
+      } case _ => {
+        pResponseObject.failure(new Exception("TypeAtPointReq failed!"))
+      }
+    }
+    pResponseObject.future
+  }
+
+  def inspectPackageByPath(path: String): Future[PackageInfo] = {
+    val pResponse = sendRequest(InspectPackageByPathReq(path))
+    val pResponseObject = Promise[PackageInfo]
+
+    pResponse.future.onComplete {
+      case esm if esm.isSuccess => {
+        val payload = esm.get
+        payload match {
+          case EnsimeServerError(desc) => {
+            pResponseObject.failure(new Exception("EnsimeSeverError " + desc))
+          }
+          case PackageInfo(_, _, _) => {
+            pResponseObject.success(payload.asInstanceOf[PackageInfo])
+          }
+          case _ => {
+            pResponseObject.failure(new Exception("InspectPackageByPathReq failed! " + "Unexpected ReturnType"))
+          }
+        }
+
+      } case _ => {
+        pResponseObject.failure(new Exception("InspectPackageByPathReq failed!"))
+      }
+    }
+    pResponseObject.future
+
+  }
+
+  def implicitInfoReq(file: File, range: OffsetRange): Future[ImplicitInfos] = {
+    val pResponse = sendRequest(ImplicitInfoReq(file, range))
+    val pResponseObject = Promise[ImplicitInfos]
+
+    pResponse.future.onComplete {
+      case esm if esm.isSuccess => {
+        val payload = esm.get
+        payload match {
+          case EnsimeServerError(desc) => {
+            pResponseObject.failure(new Exception("EnsimeSeverError " + desc))
+          }
+          case ImplicitInfos(_) => {
+            pResponseObject.success(payload.asInstanceOf[ImplicitInfos])
+          }
+          case _ => {
+            pResponseObject.failure(new Exception("ImplicitInfoReq failed! " + "Unexpected ReturnType"))
+          }
+        }
+
+      } case _ => {
+        pResponseObject.failure(new Exception("ImplicitInfoReq failed!"))
+      }
+    }
+    pResponseObject.future
+  }
+
+  // ===========================================================================  
+  // EnsimeAsyncApi implementation - END
+  // ===========================================================================
+
+}

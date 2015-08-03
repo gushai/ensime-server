@@ -11,6 +11,7 @@ import java.io.DataOutputStream
 import scala.concurrent._
 import java.util.concurrent.ConcurrentHashMap
 import com.typesafe.scalalogging.LazyLogging
+import org.ensime.api.EnsimeServerMessage
 
 trait NetworkClientBase {
 
@@ -25,7 +26,7 @@ trait NetworkClientBase {
   def start(): Unit
   def close(): Unit
 
-  def sendMessage(p: Promise[String], msgId: Int, msg: String): Unit
+  def sendMessage(p: Promise[EnsimeServerMessage], msgId: Int, msg: String): Unit
   def sendMessage(msg: String): Unit
 
 }
@@ -35,22 +36,35 @@ trait MappingPromiseToId {
    * Map to keep track of the relation message id to promise to which to return the
    * incoming result.
    */
-  protected val mapMessageIdToPromise = new java.util.concurrent.ConcurrentHashMap[Int, Promise[String]]()
+  protected val mapMessageIdToPromise = new java.util.concurrent.ConcurrentHashMap[Int, Promise[EnsimeServerMessage]]()
 
   /**
    * Add entry id -> promise to the mapMessageIdToPromise.
    */
-  protected def IdtoPromiseAdd(msgId: Int, p: Promise[String]): Unit = {
+  protected def IdToPromiseAdd(msgId: Int, p: Promise[EnsimeServerMessage]): Unit = {
     mapMessageIdToPromise.put(msgId, p)
   }
 
   /**
    * Remove id entry from
    */
-  protected def IdtoPromiseDrop(msgId: Int): Unit = {
+  protected def IdToPromiseDrop(msgId: Int): Unit = {
     mapMessageIdToPromise.remove(msgId)
   }
 
+  /**
+   * Get Promise and remove from map based on Id
+   * Note: Does not check whether entry exists!
+   */
+  protected def getPromiseAndRemoveEntry(msgId: Int): Promise[EnsimeServerMessage] = {
+    val p = mapMessageIdToPromise.get(msgId)
+    IdToPromiseDrop(msgId)
+    p
+  }
+
+  protected def doesPromiseEntryExist(msgId: Int): Boolean = {
+    return mapMessageIdToPromise.containsKey(msgId)
+  }
 }
 
 class NetworkClientContext(
@@ -95,7 +109,7 @@ abstract class NetworkClientMain(implicit context: NetworkClientContext)
             try {
               if (in.available() != 0) {
                 val msg = readIncomingMessageFromInputStream(in);
-                //                println("[Listener Thread!] " + msg)
+                //println("[NetworkClient Listener Thread] " + msg)
                 handleReceivedMessage(msg)
               }
             } catch {
@@ -136,12 +150,12 @@ abstract class NetworkClientMain(implicit context: NetworkClientContext)
   /**
    * Handles incoming messages.
    */
-  protected def handleReceivedMessage(msg: String): Unit
+  protected def handleReceivedMessage(responseMessage: String): Unit
 
   /**
    * Returns the id of the incoming message.
    */
-  def getMessageId(msg: String): Option[Int]
+  //  def getMessageId(msg: String): Option[Int]
 
   // ---------------------------------------------------------------------------
   // Outgoing messages
@@ -152,8 +166,6 @@ abstract class NetworkClientMain(implicit context: NetworkClientContext)
    */
   def sendMessage(msg: String): Unit = {
     val msgBytes = (addPaddingToOutgoingMessage(msg) + msg).getBytes("UTF-8")
-
-    println("Sending: " + msg)
 
     if (context.verbose)
       logger.info("Bytes Send: " + msgBytes.toString())
@@ -172,8 +184,11 @@ abstract class NetworkClientMain(implicit context: NetworkClientContext)
   /**
    * Send message and create entry in promise to message id map.
    */
-  def sendMessage(p: Promise[String], msgId: Int, msg: String): Unit = {
-    IdtoPromiseAdd(msgId, p)
+  def sendMessage(p: Promise[EnsimeServerMessage], msgId: Int, msg: String): Unit = {
+    if (context.verbose)
+      logger.info("Sending message: " + msg)
+
+    IdToPromiseAdd(msgId, p)
     sendMessage(msg)
   }
 

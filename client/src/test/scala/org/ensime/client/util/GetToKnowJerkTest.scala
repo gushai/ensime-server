@@ -19,6 +19,11 @@ import org.ensime.api.ConnectionInfo
 import org.ensime.api.TypeInspectInfo
 import org.ensime.api.SymbolAtPointReq
 import org.ensime.api.SymbolInfo
+import org.ensime.api.OffsetSourcePosition
+import org.ensime.api.LineSourcePosition
+import org.ensime.api.OffsetSourcePosition
+import javax.swing.JTree.EmptySelectionModel
+import org.ensime.api.EmptySourcePosition
 
 /**
  * @author gus
@@ -27,7 +32,7 @@ import org.ensime.api.SymbolInfo
 trait CommonInputs {
 
   // Connection
-  val netClient = new NetworkClientJerk()(new NetworkClientContext("127.0.0.1", 46706, true))
+  val netClient = new NetworkClientJerk()(new NetworkClientContext("127.0.0.1", 51661, true))
 
   // Call id simulation
   val callIdCounter = new AtomicInteger(1)
@@ -202,6 +207,8 @@ class GetToKnowJerkTest extends FunSpec with BeforeAndAfterAll with CommonInputs
       import org.ensime.jerk.JerkFormats._
       import org.ensime.jerk.JerkEnvelopeFormats._
 
+      println("\n\nSymbolInfoReq")
+
       val jsonAst = response.parseJson
       println(jsonAst)
       val json = jsonAst.prettyPrint // or .compactPrint
@@ -218,6 +225,26 @@ class GetToKnowJerkTest extends FunSpec with BeforeAndAfterAll with CommonInputs
           println(name)
           println(localName)
           println(declPos)
+
+          if (declPos.isDefined) {
+            val srcPos = declPos.get
+            if (srcPos.isInstanceOf[OffsetSourcePosition])
+              println("OffsetSourcePosition")
+            else if (srcPos.isInstanceOf[LineSourcePosition])
+              println("LinesourcePosition")
+            else
+              println("Unknown SourcePositionType")
+
+            srcPos match {
+              case OffsetSourcePosition(file, offset) => {
+
+              }
+              case LineSourcePosition(file, line) => {
+
+              }
+              case EmptySourcePosition() => {}
+            }
+          }
           println(isCallable)
           println(ownerTypeId)
         }
