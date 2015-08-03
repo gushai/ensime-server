@@ -166,10 +166,6 @@ abstract class NetworkClientMain(implicit context: NetworkClientContext)
    */
   def sendMessage(msg: String): Unit = {
     val msgBytes = (addPaddingToOutgoingMessage(msg) + msg).getBytes("UTF-8")
-
-    if (context.verbose)
-      logger.info("Bytes Send: " + msgBytes.toString())
-
     out.write(msgBytes, 0, msgBytes.length);
     out.flush()
   }
