@@ -65,6 +65,8 @@ trait MappingPromiseToId {
   protected def doesPromiseEntryExist(msgId: Int): Boolean = {
     return mapMessageIdToPromise.containsKey(msgId)
   }
+  
+  protected def mapSize() : Int = { return mapMessageIdToPromise.size() }
 }
 
 class NetworkClientContext(
