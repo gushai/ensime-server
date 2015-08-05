@@ -94,8 +94,10 @@ abstract class NetworkClientMain(implicit context: NetworkClientContext)
    * Close the socket listening thread.
    */
   def close(): Unit = {
+    logger.info("Closing network client ...")
     hasShutdownFlagInputStream.set(true)
     timeoutUnansweredRequests()
+    logger.info("Done.")
   }
 
   /**
@@ -111,7 +113,6 @@ abstract class NetworkClientMain(implicit context: NetworkClientContext)
             try {
               if (in.available() != 0) {
                 val msg = readIncomingMessageFromInputStream(in);
-                //println("[NetworkClient Listener Thread] " + msg)
                 handleReceivedMessage(msg)
               }
             } catch {
@@ -184,7 +185,7 @@ abstract class NetworkClientMain(implicit context: NetworkClientContext)
    */
   def sendMessage(p: Promise[EnsimeServerMessage], msgId: Int, msg: String): Unit = {
     if (context.verbose)
-      logger.info("Sending message: " + msg)
+      logger.info("Sending message: " + msg.take(100))
 
     IdToPromiseAdd(msgId, p)
     sendMessage(msg)
