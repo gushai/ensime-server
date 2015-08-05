@@ -10,7 +10,7 @@ import org.ensime.api.EnsimeServerError
 class NetworkClientJerk(implicit context: NetworkClientContext) extends NetworkClientMain {
 
   def handleReceivedMessage(responseMessage: String): Unit = {
-    // println("[handleReceivedMessage]" + responseMessage + "\n")
+    logger.info("[Incoming Message]" + responseMessage.take(150))
 
     import spray.json._
     import org.ensime.jerk.JerkFormats._

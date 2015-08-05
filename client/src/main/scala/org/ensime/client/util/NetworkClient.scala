@@ -65,8 +65,7 @@ trait MappingPromiseToId {
   protected def doesPromiseEntryExist(msgId: Int): Boolean = {
     return mapMessageIdToPromise.containsKey(msgId)
   }
-  
-  protected def mapSize() : Int = { return mapMessageIdToPromise.size() }
+
 }
 
 class NetworkClientContext(
@@ -96,6 +95,7 @@ abstract class NetworkClientMain(implicit context: NetworkClientContext)
    */
   def close(): Unit = {
     hasShutdownFlagInputStream.set(true)
+    timeoutUnansweredRequests()
   }
 
   /**
@@ -188,6 +188,27 @@ abstract class NetworkClientMain(implicit context: NetworkClientContext)
 
     IdToPromiseAdd(msgId, p)
     sendMessage(msg)
+  }
+
+  // ---------------------------------------------------------------------------
+  // Debugging tools
+  // ---------------------------------------------------------------------------
+
+  def getNumberOfOpenRequests(): Int = { mapMessageIdToPromise.size }
+
+  protected def timeoutUnansweredRequests(): Unit = {
+    logger.info("[Unanswered requests] There are " + getNumberOfOpenRequests() + " open requests.")
+    if (getNumberOfOpenRequests() > 0) {
+      logger.info("[Unanswered requests] There are ")
+      logger.info("[Unanswered requests] Sending timeouts ... ")
+      val values = mapMessageIdToPromise.values()
+
+      val valueIter = values.iterator()
+      while (valueIter.hasNext()) {
+        val p = valueIter.next()
+        p.failure(new Exception("TIME OUT NO ANSWER"))
+      }
+    }
   }
 
 }
