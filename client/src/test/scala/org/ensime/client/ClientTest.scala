@@ -15,7 +15,7 @@ import org.ensime.api.ArrowTypeInfo
 class ClientTest extends FunSpec with BeforeAndAfterAll {
 
   val host = "127.0.0.1"
-  val port = 51661
+  val port = 55357
 
   val logString = "[ClientClient]\t"
 
@@ -231,6 +231,24 @@ class ClientTest extends FunSpec with BeforeAndAfterAll {
         case Success(iI) => {
           println("Implicit conversions infos: \n")
           iI.infos.foreach { x => println("\n" + x + "\n") }
+
+        }
+        case Failure(t) => {
+          fail(t)
+        }
+      }
+
+    }
+
+    it("should send a InspectTypeByIdReq") {
+      val typeId = 1
+      val implicitInfo = client.inspectTypeById(typeId)
+
+      implicitInfo.onComplete {
+
+        case Success(tII) => {
+          println("TypeInspectInfo:\n")
+          println(tII.toString)
 
         }
         case Failure(t) => {

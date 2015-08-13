@@ -170,6 +170,34 @@ class Client(implicit context: ClientContext)
     pResponseObject.future
 
   }
+
+  def inspectTypeById(id: Int): Future[TypeInspectInfo] = {
+
+    val pResponse = sendRequest(InspectTypeByIdReq(id))
+
+    val pResponseObject = Promise[TypeInspectInfo]
+
+    pResponse.future.onComplete {
+      case esm if esm.isSuccess => {
+        val payload = esm.get
+        payload match {
+          case EnsimeServerError(desc) => {
+            pResponseObject.failure(new Exception("EnsimeSeverError " + desc))
+          }
+          case TypeInspectInfo(_, _, _, _) => { pResponseObject.success(payload.asInstanceOf[TypeInspectInfo]) }
+          case _ => {
+            pResponseObject.failure(new Exception("InspectTypeByIdReq failed! " + "Unexpected ReturnType"))
+          }
+        }
+
+      } case _ => {
+        pResponseObject.failure(new Exception("InspectTypeByIdReq failed!"))
+      }
+    }
+    pResponseObject.future
+
+  }
+
   def symbolAtPoint(file: File, point: Int): Future[SymbolInfo] = {
 
     val pResponse = sendRequest(SymbolAtPointReq(file, point))
