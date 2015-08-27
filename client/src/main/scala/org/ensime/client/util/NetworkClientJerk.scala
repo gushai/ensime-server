@@ -17,12 +17,26 @@ class NetworkClientJerk(implicit context: NetworkClientContext) extends NetworkC
     import org.ensime.jerk.JerkFormats._
     import org.ensime.jerk.JerkEnvelopeFormats._
 
-    // TODO: Do async via a Future? 
-    val jsonAst = responseMessage.parseJson
-    val responseEnvelope = jsonAst.convertTo[RpcResponseEnvelope]
+    // TODO: Do async via a Future?
+    val responseEnvelope = try {
+      val jsonAst = responseMessage.parseJson
+      Some(jsonAst.convertTo[RpcResponseEnvelope])
+    } catch {
+      case e: Throwable => {
+        logger.error("Message can not be parsed by spray.json. " + e.getMessage)
+        None
+      }
+    }
 
     // Return to caller
-    returnToCaller(responseEnvelope)
+    responseEnvelope match {
+      case Some(responseEnv) => {
+        returnToCaller(responseEnv)
+      }
+      case None => {
+        logger.error("Incoming message could not be parsed! Exception thrown by spary.json. Message is ignored.")
+      }
+    }
 
   }
 
