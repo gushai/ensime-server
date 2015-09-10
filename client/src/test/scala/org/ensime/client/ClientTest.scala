@@ -12,23 +12,38 @@ import org.ensime.api.OffsetSourcePosition
 import org.ensime.api.ArrowTypeInfo
 import org.ensime.api.ArrowTypeInfo
 
+/**
+ * Tests the ensime-client by sending requests to an ensime-server.
+ * 
+ * Note:  
+ *    - The port of the server needs to be adjusted before the test is run.
+ *    - The path to the file used needs to be adjusted.
+ *    - The offset range in some requests need to be adjuted.
+ */
 class ClientTest extends FunSpec with BeforeAndAfterAll {
 
+  
   val host = "127.0.0.1"
-  val port = 55357
+  val port = ???
 
   val logString = "[ClientClient]\t"
 
   val client = new Client()(new ClientContext(host, port, true))
+  
   // File used in all tests 
-  val path = "/home/gus/coding/scala/bscthesis/codeprose/codeprosetestprojects/codeprosetestprojects/testproject000/src/main/scala/org/codeprose/rational/Example.scala"
+  val path : String = ??? // Path to scala file.
 
+  /*
+   * Sets connection to server. 
+   */
   override def beforeAll() {
-
     client.initialize()
     log("Done.")
   }
 
+  /*
+   * Waits briefly and shuts down client.
+   */
   override def afterAll() {
     log("Waiting for results...")
     Thread.sleep(2000)
@@ -42,9 +57,11 @@ class ClientTest extends FunSpec with BeforeAndAfterAll {
     println(logString + msg)
   }
 
+  
   describe("A ENSIME-Client") {
 
     ignore("should send and receive a ConnectionInfoReq") {
+     
       val connectionInfo = client.connectionInfo()
 
       connectionInfo.onComplete {
@@ -68,7 +85,8 @@ class ClientTest extends FunSpec with BeforeAndAfterAll {
     ignore("should send and receive a SymbolDesignationsReq") {
       val f = new File(path)
       val start = 0
-      val end = 588
+      val end = ???
+      
       val requestedTypes = org.ensime.api.SourceSymbol.allSymbols
       val semanticHighlight = client.symbolDesignations(f, start, end, requestedTypes)
 
@@ -76,7 +94,6 @@ class ClientTest extends FunSpec with BeforeAndAfterAll {
         case Success(sH) => {
           //sH.syms.foreach(println)
           assert(sH.file.getAbsolutePath.equals(path))
-
         }
         case Failure(t) => {
           println("An error has occured: " + t.getMessage)
@@ -87,9 +104,10 @@ class ClientTest extends FunSpec with BeforeAndAfterAll {
     }
 
     ignore("should send a InspectTypeAtPoint w/ from eq to") {
+      
       val file = new File(path)
-      val rangeFrom = 314
-      val rangeTo = 314
+      val rangeFrom = ???
+      val rangeTo = ???
       val typeInspectInfo = client.inspectTypeAtPoint(file, new OffsetRange(rangeFrom, rangeTo))
 
       typeInspectInfo.onComplete {
@@ -110,9 +128,9 @@ class ClientTest extends FunSpec with BeforeAndAfterAll {
     }
 
     ignore("should send a SymbolInfoReq") {
+      
       val file = new File(path)
-      val point = 324
-      //val point = 398 // Points to a function call
+      val point = ???
       val symbolInfo = client.symbolAtPoint(file, point)
 
       symbolInfo.onComplete {
@@ -125,10 +143,8 @@ class ClientTest extends FunSpec with BeforeAndAfterAll {
             } else {
               fail("Unexpected SourcePosition")
             }
-
           } else
             fail()
-
         }
         case Failure(t) => {
           fail(t)
@@ -138,8 +154,9 @@ class ClientTest extends FunSpec with BeforeAndAfterAll {
     }
 
     ignore("should send a TypeAtPointReq with range input from eq to (BasicTypeInfo expected)") {
+    
       val file = new File(path)
-      val start = 324
+      val start = ???
       val typeInfo = client.typeAtPoint(file, new OffsetRange(start, start))
 
       typeInfo.onComplete {
@@ -158,9 +175,11 @@ class ClientTest extends FunSpec with BeforeAndAfterAll {
 
       }
     }
+    
     ignore("should send a TypeAtPointReq with range input from eq to (ArrowTypeInfo expected)") {
+    
       val file = new File(path)
-      val start = 398
+      val start = ???
       val typeInfo = client.typeAtPoint(file, new OffsetRange(start, start))
 
       typeInfo.onComplete {
@@ -183,7 +202,7 @@ class ClientTest extends FunSpec with BeforeAndAfterAll {
 
     ignore("should send a UsesOfSymbolAtPointReq") {
       val file = new File(path)
-      val point = 314
+      val point = ???
       val usesOfSymbol = client.usesOfSymAtPoint(file, point)
 
       usesOfSymbol.onComplete {
@@ -200,7 +219,8 @@ class ClientTest extends FunSpec with BeforeAndAfterAll {
     }
 
     it("should send a InspectPackageByPath (path: org.codeprose.rational)") {
-      val path = "org.codeprose.rational"
+
+      val path = ??? // something like: "org.codeprose.rational"
       val packageInfo = client.inspectPackageByPath(path)
 
       println("\nInspectPackageByPath\n")
@@ -208,7 +228,7 @@ class ClientTest extends FunSpec with BeforeAndAfterAll {
       packageInfo.onComplete {
 
         case Success(pI) => {
-          assert(pI.fullName == "org.codeprose.rational")
+          assert(pI.fullName == path)
           println(pI.fullName)
           pI.members.foreach(x => println("\n" + x.toString + "\n"))
         }
@@ -223,7 +243,7 @@ class ClientTest extends FunSpec with BeforeAndAfterAll {
 
       val file = new File(path)
       val rangeFrom = 0
-      val rangeTo = 589
+      val rangeTo = ???
       val implicitInfo = client.implicitInfoReq(file, new OffsetRange(rangeFrom, rangeTo))
 
       implicitInfo.onComplete {
@@ -241,6 +261,7 @@ class ClientTest extends FunSpec with BeforeAndAfterAll {
     }
 
     it("should send a InspectTypeByIdReq") {
+      
       val typeId = 1
       val implicitInfo = client.inspectTypeById(typeId)
 
@@ -257,22 +278,7 @@ class ClientTest extends FunSpec with BeforeAndAfterAll {
       }
 
     }
-
-    //
-    //    ignore("should send a TypecheckFileReq") {
-    //      val f = new File("/home/gus/scala/sbtlearn/rational/src/main/scala/de/uni/tuebingen/rational/rational.scala")
-    //      client.typecheckFile(SourceFileInfo(f, None, None))
-    //    }
-    //
-    //    ignore("should send a TypecheckAllReq") {
-    //      client.typecheckAll()
-    //    }
-    //
-    //    ignore("should send a ShutdownReq") {
-    //      //client.shutdownServer()
-    //      fail()
-    //    }
-    //
+    
   }
 
 }

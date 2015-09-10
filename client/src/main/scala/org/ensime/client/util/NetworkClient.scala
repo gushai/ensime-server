@@ -13,25 +13,48 @@ import java.util.concurrent.ConcurrentHashMap
 import com.typesafe.scalalogging.LazyLogging
 import org.ensime.api.EnsimeServerMessage
 
+/**
+ * Base for a network client to connect to an ensime-server.
+ *
+ */
 trait NetworkClientBase {
 
-  /*
-   * Networking stuff
-   */
   protected val clientSocket: Socket
 
   protected val out: DataOutputStream
   protected val in: DataInputStream
 
+  /**
+   * Use to setup up connection with ensime-server.
+   */
   def start(): Unit
+
+  /**
+   * Use to close connection with ensime-server.
+   */
   def close(): Unit
 
+  /**
+   * Use to send a message to the ensime-server with direct response.
+   * @param p     Promise to return the server response (EnsimeServerMessage) to.
+   * @param msgId Unique id assigned to the message.
+   * @param msg   Message to be sent.
+   */
   def sendMessage(p: Promise[EnsimeServerMessage], msgId: Int, msg: String): Unit
+
+  /**
+   * Use to send a message to the ensime-server without direct response.
+   * @param msg   Message to be sent.
+   */
   def sendMessage(msg: String): Unit
 
 }
 
+/**
+ * Contains the mechanism to map message ids to their return Promise.
+ */
 trait MappingPromiseToId {
+
   /**
    * Map to keep track of the relation message id to promise to which to return the
    * incoming result.
@@ -40,13 +63,16 @@ trait MappingPromiseToId {
 
   /**
    * Add entry id -> promise to the mapMessageIdToPromise.
+   * @param   msgId Message id.
+   * @param   p     Promise to EnsimeServerMessage.
    */
   protected def IdToPromiseAdd(msgId: Int, p: Promise[EnsimeServerMessage]): Unit = {
     mapMessageIdToPromise.put(msgId, p)
   }
 
   /**
-   * Remove id entry from
+   * Remove id entry from map.
+   * @param msgId Message id.
    */
   protected def IdToPromiseDrop(msgId: Int): Unit = {
     mapMessageIdToPromise.remove(msgId)
@@ -55,6 +81,7 @@ trait MappingPromiseToId {
   /**
    * Get Promise and remove from map based on Id
    * Note: Does not check whether entry exists!
+   * @param msgId Message id.
    */
   protected def getPromiseAndRemoveEntry(msgId: Int): Promise[EnsimeServerMessage] = {
     val p = mapMessageIdToPromise.get(msgId)
@@ -62,19 +89,33 @@ trait MappingPromiseToId {
     p
   }
 
+  /**
+   * Checks of entry with certain id exists.
+   * @param msgId Message id.
+   * @return      Boolean indicator.
+   */
   protected def doesPromiseEntryExist(msgId: Int): Boolean = {
     return mapMessageIdToPromise.containsKey(msgId)
   }
 
 }
 
+/**
+ * NetworkClient helper. Contains server information.
+ * @param host  Ip of the ensime-server.
+ * @parm  port  Port of the ensime-server.
+ */
 class NetworkClientContext(
-    val host: String,
-    val port: Int,
-    val verbose: Boolean
-) {
-}
+  val host: String,
+  val port: Int,
+  val verbose: Boolean
+)
 
+/**
+ * Network client to connect to an ensime-server.
+ * It is missing the protocol specific functionality.
+ * @param context NetworkClientContext
+ */
 abstract class NetworkClientMain(implicit context: NetworkClientContext)
     extends NetworkClientBase with MappingPromiseToId with LazyLogging {
 
@@ -91,7 +132,7 @@ abstract class NetworkClientMain(implicit context: NetworkClientContext)
   }
 
   /**
-   * Close the socket listening thread.
+   * Closes the socket listening thread.
    */
   def close(): Unit = {
     logger.info("Closing network client ...")
@@ -102,6 +143,12 @@ abstract class NetworkClientMain(implicit context: NetworkClientContext)
 
   /**
    * Starts the thread listening on the socket.
+   *
+   * Incoming messages are read by readIncomingMessageFromInputStream()
+   * and then handles by handleReceivedMessage()
+   *
+   * @param inputStream InputStream of clientSocket.
+   *
    */
   private val hasShutdownFlagInputStream = new AtomicBoolean(false)
   private def startMonitoringSocket(inputStream: InputStream): Unit = {
@@ -135,6 +182,14 @@ abstract class NetworkClientMain(implicit context: NetworkClientContext)
 
   /**
    * Reads incoming String message from DataInputStream.
+   *
+   * The message is read in 2 steps.
+   *
+   *  1.  Read first 6 characters of message to determine message length (hex encoded).
+   *  2.  Read actual message.
+   *
+   * @param in DataInputStream
+   * @return   Message read from DataInputStream.
    */
   private def readIncomingMessageFromInputStream(in: DataInputStream): String = {
 
@@ -152,13 +207,12 @@ abstract class NetworkClientMain(implicit context: NetworkClientContext)
 
   /**
    * Handles incoming messages.
+   *
+   * Implement protocol specific handling here.
+   *
+   * @param responseMessage Incomding message.
    */
   protected def handleReceivedMessage(responseMessage: String): Unit
-
-  /**
-   * Returns the id of the incoming message.
-   */
-  //  def getMessageId(msg: String): Option[Int]
 
   // ---------------------------------------------------------------------------
   // Outgoing messages
@@ -166,6 +220,10 @@ abstract class NetworkClientMain(implicit context: NetworkClientContext)
 
   /**
    * Sends message without entry in the id->promise map.
+   *
+   * Prepends the message with its length.
+   *
+   * @param msg Message to be send.
    */
   def sendMessage(msg: String): Unit = {
     val msgBytes = (addPaddingToOutgoingMessage(msg) + msg).getBytes("UTF-8")
@@ -174,7 +232,9 @@ abstract class NetworkClientMain(implicit context: NetworkClientContext)
   }
 
   /**
-   * Adds 6 bytes of message length length information in 0x to the front of the message.
+   * Adds 6 bytes of message length information in 0x to the front of the message.
+   * @param   msg Message
+   * @return      Message length + message.
    */
   private def addPaddingToOutgoingMessage(msg: String): String = {
     "%06x".format(msg.length)
@@ -182,6 +242,9 @@ abstract class NetworkClientMain(implicit context: NetworkClientContext)
 
   /**
    * Send message and create entry in promise to message id map.
+   * @param p     Promise to return server response to.
+   * @param msgId Message id.
+   * @param msg   Message to be sent.
    */
   def sendMessage(p: Promise[EnsimeServerMessage], msgId: Int, msg: String): Unit = {
     if (context.verbose)
@@ -195,10 +258,18 @@ abstract class NetworkClientMain(implicit context: NetworkClientContext)
   // Debugging tools
   // ---------------------------------------------------------------------------
 
+  /**
+   * Returns the number of unanswered requests.
+   * @return  Number of unanswered requests.
+   */
   def getNumberOfOpenRequests(): Int = { mapMessageIdToPromise.size }
 
+  /**
+   * Sends time out to all unanswered response promises.
+   */
   protected def timeoutUnansweredRequests(): Unit = {
     logger.info("[Unanswered requests] There are " + getNumberOfOpenRequests() + " open requests.")
+
     if (getNumberOfOpenRequests() > 0) {
       logger.info("[Unanswered requests] There are ")
       logger.info("[Unanswered requests] Sending timeouts ... ")

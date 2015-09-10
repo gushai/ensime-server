@@ -25,31 +25,50 @@ import org.ensime.api.OffsetSourcePosition
 import javax.swing.JTree.EmptySelectionModel
 import org.ensime.api.EmptySourcePosition
 
-/**
- * @author gus
- */
+// TODO: Clean up or delete!
 
+
+/**
+ * Common inputs used in the test below.
+ * 
+ * Fill in:
+ * -  port
+ * -  path
+ * 
+ */
 trait CommonInputs {
 
   // Connection
-  val netClient = new NetworkClientJerk()(new NetworkClientContext("127.0.0.1", 51661, true))
+  val host  = "127.0.0.1"
+  val port  = ???
+  val netClient = new NetworkClientJerk()(new NetworkClientContext(host, port, true))
 
   // Call id simulation
   val callIdCounter = new AtomicInteger(1)
 
   // Request information
-  val path = "/home/gus/coding/scala/bscthesis/codeprose/codeprosetestprojects/codeprosetestprojects/testproject000/src/main/scala/org/codeprose/rational/Example.scala"
+  val path : String = ??? // Path to a scala file.
   val file = new File(path)
 
 }
 
+/**
+ * Test class to understand the jerk protocol.
+ */
 class GetToKnowJerkTest extends FunSpec with BeforeAndAfterAll with CommonInputs {
   import org.ensime.client.util.WireFormatterJerk
 
+  /*
+   * Setup connection to ensime-server.
+   */
   override def beforeAll() = {
     println("Setting up network client")
     netClient.start()
   }
+  
+  /*
+   * Closing client after brief wait.
+   */
   override def afterAll() = {
     println("Waiting for repsonses ... ")
     Thread.sleep(5000)

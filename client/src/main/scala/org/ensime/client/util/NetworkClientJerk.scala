@@ -4,12 +4,17 @@ import org.ensime.api.RpcResponseEnvelope
 import org.ensime.api.EnsimeServerError
 
 /**
- * @author gus
+ * Ensime-client using the Jerk protocol.
+ * @param context NetworkClientContext
  */
-
 class NetworkClientJerk(implicit context: NetworkClientContext) extends NetworkClientMain {
 
+  /**
+   * Translates incoming response from the ensime server into information objects from
+   * org.ensime.api.outgoing
+   */
   def handleReceivedMessage(responseMessage: String): Unit = {
+
     if (context.verbose)
       logger.info("[Incoming Message]" + responseMessage.take(150))
 
@@ -40,6 +45,15 @@ class NetworkClientJerk(implicit context: NetworkClientContext) extends NetworkC
 
   }
 
+  /**
+   * Returns the incoming server response to the caller (i.e. assigned promise).
+   *
+   * Messages without message id are print to std out.
+   *
+   * TODO: Implement here where to send incoming messages without message id.
+   *
+   * @param   responseEnvelope  RpcResponseEnvelope
+   */
   private def returnToCaller(responseEnvelope: RpcResponseEnvelope): Unit = {
 
     responseEnvelope.callId match {
